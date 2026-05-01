@@ -315,37 +315,49 @@ function getFilteredData() {
   return data;
 }
 
-// ── Renderizar KPIs ────────────────────────────────
+// ── Renderizar KPIs desde resumen oficial SIAF ─────
+function renderKPIsFromResumen(resumen) {
+  actualizarKPIs(
+    resumen.pim,
+    resumen.devengado,
+    resumen.girado,
+    resumen.comprometido,
+    resumen.avance_pct,
+  );
+}
+
+// ── Renderizar KPIs calculados desde filas ──────────
 function renderKPIs(data) {
   const totalPIM        = sum(data, 'pim');
   const totalDevengado  = sum(data, 'devengado');
   const totalGirado     = sum(data, 'girado');
   const totalCompro     = sum(data, 'comprometido');
   const pct             = fmt.pctNum(totalDevengado, totalPIM);
+  actualizarKPIs(totalPIM, totalDevengado, totalGirado, totalCompro, pct);
+}
 
-  document.getElementById('kpi-pim').textContent         = fmt.currency(totalPIM);
-  document.getElementById('kpi-devengado').textContent   = fmt.currency(totalDevengado);
-  document.getElementById('kpi-girado').textContent      = fmt.currency(totalGirado);
-  document.getElementById('kpi-comprometido').textContent = fmt.currency(totalCompro);
-  document.getElementById('kpi-pct').textContent         = `${fmt.pct(totalDevengado, totalPIM)} del presupuesto asignado`;
+function actualizarKPIs(pim, devengado, girado, comprometido, pct) {
 
-  // Barra de ejecución
+  document.getElementById('kpi-pim').textContent          = fmt.currency(pim);
+  document.getElementById('kpi-devengado').textContent    = fmt.currency(devengado);
+  document.getElementById('kpi-girado').textContent       = fmt.currency(girado);
+  document.getElementById('kpi-comprometido').textContent = fmt.currency(comprometido);
+  document.getElementById('kpi-pct').textContent          = `${pct}% del presupuesto asignado`;
+
   const bar   = document.getElementById('exec-bar-fill');
   const track = document.getElementById('exec-bar-track');
   const label = document.getElementById('exec-pct-label');
 
-  label.textContent        = `${pct}%`;
-  label.style.color        = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--gold)' : 'var(--red)';
+  label.textContent    = `${pct}%`;
+  label.style.color    = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--gold)' : 'var(--red)';
   track.setAttribute('aria-valuenow', pct);
-  bar.style.background     = pct >= 80
+  bar.style.background = pct >= 80
     ? 'linear-gradient(90deg, var(--green), #4CAF50)'
     : pct >= 60
       ? 'linear-gradient(90deg, var(--gold), #FFC107)'
       : 'linear-gradient(90deg, var(--red), #EF5350)';
 
   setTimeout(() => { bar.style.width = Math.min(pct, 100) + '%'; }, 80);
-
-  return { totalPIM, totalDevengado };
 }
 
 // ── Renderizar tabla ───────────────────────────────
@@ -471,8 +483,20 @@ async function consultar() {
   document.getElementById('results-subtitle').textContent =
     `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
 
+  // Mostrar fecha de actualización oficial si está disponible
+  if (resultado?.ultimaActualizacion) {
+    document.getElementById('results-subtitle').textContent +=
+      ` · Actualizado: ${resultado.ultimaActualizacion}`;
+  }
+
   setBadgeFuente(dataSource);
-  renderKPIs(currentData);
+
+  // Si tenemos resumen oficial usarlo para los KPIs (más preciso que sumar filas)
+  if (dataSource === 'oficial' && resultado?.resumen) {
+    renderKPIsFromResumen(resultado.resumen);
+  } else {
+    renderKPIs(currentData);
+  }
   renderTable(currentData);
 
   document.getElementById('empty-state').hidden   = true;
@@ -599,34 +623,63 @@ function initKeyboardShortcuts() {
 }
 
 // ── API oficial — servidor Node proxy ──────────────
-//
-//  Cuando corres "node server.js", el frontend llama
-//  al proxy local que consulta el SIAF-MEF por ti.
-//
-const API_BASE = window.location.port === '3000'
-  ? ''           // mismo servidor Node
-  : null;        // sin Node → usar demo
+const API_BASE = window.location.port === '3000' ? '' : null;
 
-async function cargarDatosOficiales({ anio, nivel, region, sector } = {}) {
-  if (!API_BASE && API_BASE !== '') {
-    return { fuente: 'demo', datos: null };
-  }
+// Limpia prefijos del SIAF: "E: GOBIERNO NACIONAL" → "Gobierno Nacional"
+function limpiarNombre(nombre) {
+  return nombre
+    .replace(/^[A-Z0-9]+:\s*/,  '')      // quita "E: ", "M: ", "R: ", "01 ", etc.
+    .replace(/GOBIERNOS?\s+/gi, 'Gob. ')
+    .replace(/\b(\w)/g, c => c.toUpperCase())
+    .replace(/\bDe\b/g, 'de')
+    .trim();
+}
+
+// Elige la dimensión de drill-down según los filtros del usuario
+function elegirDimension(nivel, sector) {
+  if (sector)                              return 'funcion';
+  if (nivel === 'nacional')                return 'gobierno';
+  if (nivel === 'regional' || nivel === 'local') return 'gobierno';
+  return 'gobierno'; // default: desglose por nivel de gobierno
+}
+
+// Filtra las filas del API según el nivel elegido
+function filtrarPorNivel(detalle, nivel) {
+  if (!nivel) return detalle;
+  const mapa = {
+    nacional: 'NACIONAL',
+    regional: 'REGIONAL',
+    local:    'LOCAL',
+  };
+  const kw = mapa[nivel];
+  if (!kw) return detalle;
+  return detalle.filter(d => d.sector.toUpperCase().includes(kw));
+}
+
+async function cargarDatosOficiales({ anio, nivel, sector } = {}) {
+  if (API_BASE === null) return { fuente: 'demo', datos: null };
 
   try {
-    const params = new URLSearchParams({ anio });
-    if (nivel)  params.set('nivel',  nivel);
-    if (region) params.set('region', region);
-    if (sector) params.set('sector', sector);
-
-    const res  = await fetch(`${API_BASE}/api/consulta?${params}`, {
-      signal: AbortSignal.timeout(8000),
+    const dim    = elegirDimension(nivel, sector);
+    const params = new URLSearchParams({ anio, dim });
+    const res    = await fetch(`${API_BASE}/api/consulta?${params}`, {
+      signal: AbortSignal.timeout(12000),
     });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const json = await res.json();
     if (!json.detalle?.length) throw new Error('Sin registros');
 
-    return { fuente: 'oficial', datos: json.detalle, resumen: json.resumen };
+    // Filtrar y normalizar nombres
+    let detalle = filtrarPorNivel(json.detalle, nivel);
+    detalle = detalle.map(d => ({ ...d, sector: limpiarNombre(d.sector) }));
+
+    return {
+      fuente:           'oficial',
+      datos:            detalle,
+      resumen:          json.resumen,
+      ultimaActualizacion: json.ultima_actualizacion,
+    };
   } catch (err) {
     console.warn('[API] Fallback a demo:', err.message);
     return { fuente: 'demo', datos: null };
