@@ -55,7 +55,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="container hero-inner">
       <div class="hero-content">
-        <span class="hero-badge">🇵🇪 Datos oficiales del Estado Peruano</span>
+        <span class="hero-badge">🇵🇪 Portal de Transparencia — MEF Perú</span>
         <h1 class="hero-title" id="hero-title">
           ¿En qué se gasta<br />el dinero del Estado?
         </h1>
@@ -207,6 +207,47 @@
             </div>
           </div>
 
+          <!-- Región (visible solo en Gobierno Regional/Local) -->
+          <div class="filter-group" id="group-region" hidden>
+            <label class="filter-label" for="select-region">
+              Región / Departamento
+            </label>
+            <div class="select-wrapper">
+              <select id="select-region" class="filter-select">
+                <option value="">-- Todas las regiones --</option>
+                <option value="amazonas">Amazonas</option>
+                <option value="ancash">Áncash</option>
+                <option value="apurimac">Apurímac</option>
+                <option value="arequipa">Arequipa</option>
+                <option value="ayacucho">Ayacucho</option>
+                <option value="cajamarca">Cajamarca</option>
+                <option value="callao">Callao</option>
+                <option value="cusco">Cusco</option>
+                <option value="huancavelica">Huancavelica</option>
+                <option value="huanuco">Huánuco</option>
+                <option value="ica">Ica</option>
+                <option value="junin">Junín</option>
+                <option value="lalibertad">La Libertad</option>
+                <option value="lambayeque">Lambayeque</option>
+                <option value="lima">Lima Metropolitana</option>
+                <option value="limaregion">Lima Región</option>
+                <option value="loreto">Loreto</option>
+                <option value="madrededios">Madre de Dios</option>
+                <option value="moquegua">Moquegua</option>
+                <option value="pasco">Pasco</option>
+                <option value="piura">Piura</option>
+                <option value="puno">Puno</option>
+                <option value="sanmartin">San Martín</option>
+                <option value="tacna">Tacna</option>
+                <option value="tumbes">Tumbes</option>
+                <option value="ucayali">Ucayali</option>
+              </select>
+              <svg class="select-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
           <!-- Tipo de gasto -->
           <div class="filter-group">
             <label class="filter-label" for="select-tipo">Tipo de gasto</label>
@@ -326,6 +367,12 @@
               <p>Gastos que el Estado ya contrató pero aún no recibió. Ejemplo: contratos firmados.</p>
             </div>
           </div>
+        </div>
+
+        <!-- Aviso datos ilustrativos -->
+        <div class="demo-notice" role="note">
+          ⚠️ <span><strong>Datos ilustrativos:</strong> Esta demo muestra la estructura real del SIAF-MEF pero con valores de referencia. Para datos oficiales y en tiempo real visita
+          <a href="https://apps5.mineco.gob.pe/transparencia/Navegador/Default.aspx" target="_blank" rel="noopener">apps5.mineco.gob.pe</a>.</span>
         </div>
 
         <!-- Tabla de detalle por sector -->

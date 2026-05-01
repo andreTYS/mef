@@ -6,6 +6,8 @@
 // ══════════════════════════════════════════════════
 
 // ── Datos de demo (estructura real del SIAF-MEF) ──
+// NOTA: Datos ilustrativos basados en la estructura del SIAF.
+// Los datos reales se obtienen de apps5.mineco.gob.pe
 const DEMO_DATA = {
   sectores: [
     { sector: 'Educación',                    pim: 42850000000, devengado: 38764000000, girado: 37900000000, comprometido: 40100000000 },
@@ -26,7 +28,194 @@ const DEMO_DATA = {
     { sector: 'Relaciones Exteriores',        pim: 1200000000,  devengado: 1104000000,  girado: 1080000000,  comprometido: 1150000000  },
     { sector: 'Comercio Ext. y Turismo',      pim: 980000000,   devengado: 784000000,   girado: 756000000,   comprometido: 860000000   },
     { sector: 'Producción',                    pim: 850000000,   devengado: 680000000,   girado: 654000000,   comprometido: 740000000   },
-  ]
+  ],
+
+  // Presupuesto por Gobierno Regional — 25 regiones del Perú
+  // Fuentes de referencia: SIAF-MEF, INEI (proporcional a población y canon)
+  regiones: {
+    amazonas:    { nombre: 'Amazonas',          sectores: [
+      { sector: 'Educación',        pim: 580000000,  devengado: 498000000,  girado: 487000000,  comprometido: 520000000 },
+      { sector: 'Salud',            pim: 320000000,  devengado: 275000000,  girado: 268000000,  comprometido: 298000000 },
+      { sector: 'Transportes',      pim: 410000000,  devengado: 280000000,  girado: 270000000,  comprometido: 330000000 },
+      { sector: 'Agricultura',      pim: 180000000,  devengado: 134000000,  girado: 129000000,  comprometido: 155000000 },
+      { sector: 'Vivienda',         pim: 95000000,   devengado: 58000000,   girado: 55000000,   comprometido: 72000000  },
+    ]},
+    ancash:      { nombre: 'Áncash',            sectores: [
+      { sector: 'Educación',        pim: 1420000000, devengado: 1230000000, girado: 1198000000, comprometido: 1320000000 },
+      { sector: 'Salud',            pim: 780000000,  devengado: 668000000,  girado: 651000000,  comprometido: 720000000 },
+      { sector: 'Transportes',      pim: 950000000,  devengado: 695000000,  girado: 672000000,  comprometido: 820000000 },
+      { sector: 'Agricultura',      pim: 320000000,  devengado: 248000000,  girado: 240000000,  comprometido: 285000000 },
+      { sector: 'Vivienda',         pim: 210000000,  devengado: 140000000,  girado: 134000000,  comprometido: 175000000 },
+    ]},
+    apurimac:    { nombre: 'Apurímac',          sectores: [
+      { sector: 'Educación',        pim: 620000000,  devengado: 527000000,  girado: 514000000,  comprometido: 565000000 },
+      { sector: 'Salud',            pim: 340000000,  devengado: 285000000,  girado: 278000000,  comprometido: 312000000 },
+      { sector: 'Transportes',      pim: 480000000,  devengado: 312000000,  girado: 300000000,  comprometido: 385000000 },
+      { sector: 'Agricultura',      pim: 195000000,  devengado: 145000000,  girado: 140000000,  comprometido: 168000000 },
+      { sector: 'Vivienda',         pim: 110000000,  devengado: 65000000,   girado: 62000000,   comprometido: 82000000  },
+    ]},
+    arequipa:    { nombre: 'Arequipa',          sectores: [
+      { sector: 'Educación',        pim: 1680000000, devengado: 1478000000, girado: 1442000000, comprometido: 1580000000 },
+      { sector: 'Salud',            pim: 920000000,  devengado: 802000000,  girado: 782000000,  comprometido: 865000000 },
+      { sector: 'Transportes',      pim: 1250000000, devengado: 950000000,  girado: 920000000,  comprometido: 1080000000 },
+      { sector: 'Agricultura',      pim: 380000000,  devengado: 295000000,  girado: 286000000,  comprometido: 340000000 },
+      { sector: 'Vivienda',         pim: 280000000,  devengado: 198000000,  girado: 191000000,  comprometido: 235000000 },
+    ]},
+    ayacucho:    { nombre: 'Ayacucho',          sectores: [
+      { sector: 'Educación',        pim: 750000000,  devengado: 630000000,  girado: 614000000,  comprometido: 692000000 },
+      { sector: 'Salud',            pim: 420000000,  devengado: 348000000,  girado: 339000000,  comprometido: 385000000 },
+      { sector: 'Transportes',      pim: 590000000,  devengado: 388000000,  girado: 374000000,  comprometido: 470000000 },
+      { sector: 'Agricultura',      pim: 220000000,  devengado: 162000000,  girado: 157000000,  comprometido: 190000000 },
+      { sector: 'Vivienda',         pim: 128000000,  devengado: 78000000,   girado: 75000000,   comprometido: 98000000  },
+    ]},
+    cajamarca:   { nombre: 'Cajamarca',         sectores: [
+      { sector: 'Educación',        pim: 1320000000, devengado: 1098000000, girado: 1071000000, comprometido: 1210000000 },
+      { sector: 'Salud',            pim: 720000000,  devengado: 590000000,  girado: 575000000,  comprometido: 660000000 },
+      { sector: 'Transportes',      pim: 880000000,  devengado: 598000000,  girado: 578000000,  comprometido: 720000000 },
+      { sector: 'Agricultura',      pim: 295000000,  devengado: 218000000,  girado: 211000000,  comprometido: 256000000 },
+      { sector: 'Vivienda',         pim: 195000000,  devengado: 118000000,  girado: 113000000,  comprometido: 148000000 },
+    ]},
+    callao:      { nombre: 'Callao',            sectores: [
+      { sector: 'Educación',        pim: 980000000,  devengado: 882000000,  girado: 860000000,  comprometido: 930000000 },
+      { sector: 'Salud',            pim: 540000000,  devengado: 475000000,  girado: 463000000,  comprometido: 510000000 },
+      { sector: 'Transportes',      pim: 680000000,  devengado: 530000000,  girado: 512000000,  comprometido: 610000000 },
+      { sector: 'Vivienda',         pim: 245000000,  devengado: 178000000,  girado: 172000000,  comprometido: 208000000 },
+      { sector: 'Desarrollo Social',pim: 165000000,  devengado: 138000000,  girado: 134000000,  comprometido: 151000000 },
+    ]},
+    cusco:       { nombre: 'Cusco',             sectores: [
+      { sector: 'Educación',        pim: 1580000000, devengado: 1340000000, girado: 1307000000, comprometido: 1468000000 },
+      { sector: 'Salud',            pim: 860000000,  devengado: 722000000,  girado: 704000000,  comprometido: 800000000 },
+      { sector: 'Transportes',      pim: 1980000000, devengado: 1385000000, girado: 1340000000, comprometido: 1680000000 },
+      { sector: 'Agricultura',      pim: 450000000,  devengado: 342000000,  girado: 331000000,  comprometido: 395000000 },
+      { sector: 'Cultura / Turismo',pim: 185000000,  devengado: 142000000,  girado: 137000000,  comprometido: 162000000 },
+    ]},
+    huancavelica:{ nombre: 'Huancavelica',      sectores: [
+      { sector: 'Educación',        pim: 480000000,  devengado: 398000000,  girado: 388000000,  comprometido: 440000000 },
+      { sector: 'Salud',            pim: 265000000,  devengado: 218000000,  girado: 212000000,  comprometido: 242000000 },
+      { sector: 'Transportes',      pim: 380000000,  devengado: 240000000,  girado: 232000000,  comprometido: 298000000 },
+      { sector: 'Agricultura',      pim: 165000000,  devengado: 120000000,  girado: 116000000,  comprometido: 142000000 },
+      { sector: 'Vivienda',         pim: 88000000,   devengado: 51000000,   girado: 49000000,   comprometido: 65000000  },
+    ]},
+    huanuco:     { nombre: 'Huánuco',           sectores: [
+      { sector: 'Educación',        pim: 720000000,  devengado: 605000000,  girado: 590000000,  comprometido: 665000000 },
+      { sector: 'Salud',            pim: 395000000,  devengado: 325000000,  girado: 317000000,  comprometido: 362000000 },
+      { sector: 'Transportes',      pim: 545000000,  devengado: 360000000,  girado: 348000000,  comprometido: 435000000 },
+      { sector: 'Agricultura',      pim: 205000000,  devengado: 152000000,  girado: 147000000,  comprometido: 178000000 },
+      { sector: 'Vivienda',         pim: 118000000,  devengado: 71000000,   girado: 68000000,   comprometido: 90000000  },
+    ]},
+    ica:         { nombre: 'Ica',               sectores: [
+      { sector: 'Educación',        pim: 820000000,  devengado: 730000000,  girado: 712000000,  comprometido: 775000000 },
+      { sector: 'Salud',            pim: 450000000,  devengado: 392000000,  girado: 382000000,  comprometido: 420000000 },
+      { sector: 'Transportes',      pim: 620000000,  devengado: 480000000,  girado: 464000000,  comprometido: 548000000 },
+      { sector: 'Agricultura',      pim: 240000000,  devengado: 185000000,  girado: 179000000,  comprometido: 210000000 },
+      { sector: 'Vivienda',         pim: 158000000,  devengado: 105000000,  girado: 101000000,  comprometido: 128000000 },
+    ]},
+    junin:       { nombre: 'Junín',             sectores: [
+      { sector: 'Educación',        pim: 1180000000, devengado: 1002000000, girado: 977000000,  comprometido: 1090000000 },
+      { sector: 'Salud',            pim: 645000000,  devengado: 548000000,  girado: 534000000,  comprometido: 598000000 },
+      { sector: 'Transportes',      pim: 820000000,  devengado: 574000000,  girado: 555000000,  comprometido: 675000000 },
+      { sector: 'Agricultura',      pim: 275000000,  devengado: 207000000,  girado: 200000000,  comprometido: 240000000 },
+      { sector: 'Vivienda',         pim: 182000000,  devengado: 115000000,  girado: 111000000,  comprometido: 142000000 },
+    ]},
+    lalibertad:  { nombre: 'La Libertad',       sectores: [
+      { sector: 'Educación',        pim: 1650000000, devengado: 1418000000, girado: 1383000000, comprometido: 1540000000 },
+      { sector: 'Salud',            pim: 905000000,  devengado: 778000000,  girado: 759000000,  comprometido: 850000000 },
+      { sector: 'Transportes',      pim: 1120000000, devengado: 806000000,  girado: 780000000,  comprometido: 950000000 },
+      { sector: 'Agricultura',      pim: 360000000,  devengado: 274000000,  girado: 265000000,  comprometido: 318000000 },
+      { sector: 'Vivienda',         pim: 230000000,  devengado: 152000000,  girado: 147000000,  comprometido: 185000000 },
+    ]},
+    lambayeque:  { nombre: 'Lambayeque',        sectores: [
+      { sector: 'Educación',        pim: 1020000000, devengado: 878000000,  girado: 857000000,  comprometido: 950000000 },
+      { sector: 'Salud',            pim: 560000000,  devengado: 478000000,  girado: 466000000,  comprometido: 520000000 },
+      { sector: 'Transportes',      pim: 720000000,  devengado: 518000000,  girado: 501000000,  comprometido: 615000000 },
+      { sector: 'Agricultura',      pim: 245000000,  devengado: 185000000,  girado: 179000000,  comprometido: 215000000 },
+      { sector: 'Vivienda',         pim: 165000000,  devengado: 108000000,  girado: 104000000,  comprometido: 132000000 },
+    ]},
+    lima:        { nombre: 'Lima Metropolitana',sectores: [
+      { sector: 'Educación',        pim: 8200000000, devengado: 7462000000, girado: 7280000000, comprometido: 7850000000 },
+      { sector: 'Salud',            pim: 4500000000, devengado: 4005000000, girado: 3905000000, comprometido: 4250000000 },
+      { sector: 'Transportes',      pim: 5800000000, devengado: 4524000000, girado: 4374000000, comprometido: 5100000000 },
+      { sector: 'Vivienda',         pim: 1850000000, devengado: 1295000000, girado: 1252000000, comprometido: 1580000000 },
+      { sector: 'Desarrollo Social',pim: 980000000,  devengado: 843000000,  girado: 822000000,  comprometido: 912000000 },
+    ]},
+    limaregion:  { nombre: 'Lima Región',       sectores: [
+      { sector: 'Educación',        pim: 680000000,  devengado: 578000000,  girado: 564000000,  comprometido: 630000000 },
+      { sector: 'Salud',            pim: 375000000,  devengado: 318000000,  girado: 310000000,  comprometido: 348000000 },
+      { sector: 'Transportes',      pim: 520000000,  devengado: 364000000,  girado: 352000000,  comprometido: 420000000 },
+      { sector: 'Agricultura',      pim: 188000000,  devengado: 141000000,  girado: 136000000,  comprometido: 162000000 },
+      { sector: 'Vivienda',         pim: 120000000,  devengado: 78000000,   girado: 75000000,   comprometido: 94000000  },
+    ]},
+    loreto:      { nombre: 'Loreto',            sectores: [
+      { sector: 'Educación',        pim: 980000000,  devengado: 794000000,  girado: 774000000,  comprometido: 880000000 },
+      { sector: 'Salud',            pim: 540000000,  devengado: 432000000,  girado: 421000000,  comprometido: 490000000 },
+      { sector: 'Transportes',      pim: 680000000,  devengado: 428000000,  girado: 414000000,  comprometido: 548000000 },
+      { sector: 'Agricultura',      pim: 235000000,  devengado: 169000000,  girado: 163000000,  comprometido: 198000000 },
+      { sector: 'Vivienda',         pim: 145000000,  devengado: 84000000,   girado: 81000000,   comprometido: 108000000 },
+    ]},
+    madrededios: { nombre: 'Madre de Dios',     sectores: [
+      { sector: 'Educación',        pim: 245000000,  devengado: 210000000,  girado: 205000000,  comprometido: 228000000 },
+      { sector: 'Salud',            pim: 135000000,  devengado: 114000000,  girado: 111000000,  comprometido: 125000000 },
+      { sector: 'Transportes',      pim: 290000000,  devengado: 188000000,  girado: 182000000,  comprometido: 235000000 },
+      { sector: 'Agricultura',      pim: 98000000,   devengado: 71000000,   girado: 68000000,   comprometido: 84000000  },
+      { sector: 'Ambiente',         pim: 68000000,   devengado: 47000000,   girado: 45000000,   comprometido: 56000000  },
+    ]},
+    moquegua:    { nombre: 'Moquegua',          sectores: [
+      { sector: 'Educación',        pim: 380000000,  devengado: 336000000,  girado: 328000000,  comprometido: 358000000 },
+      { sector: 'Salud',            pim: 208000000,  devengado: 181000000,  girado: 177000000,  comprometido: 195000000 },
+      { sector: 'Transportes',      pim: 420000000,  devengado: 319000000,  girado: 308000000,  comprometido: 368000000 },
+      { sector: 'Agricultura',      pim: 145000000,  devengado: 110000000,  girado: 106000000,  comprometido: 128000000 },
+      { sector: 'Vivienda',         pim: 98000000,   devengado: 68000000,   girado: 65000000,   comprometido: 80000000  },
+    ]},
+    pasco:       { nombre: 'Pasco',             sectores: [
+      { sector: 'Educación',        pim: 410000000,  devengado: 344000000,  girado: 335000000,  comprometido: 378000000 },
+      { sector: 'Salud',            pim: 225000000,  devengado: 185000000,  girado: 180000000,  comprometido: 208000000 },
+      { sector: 'Transportes',      pim: 348000000,  devengado: 226000000,  girado: 218000000,  comprometido: 278000000 },
+      { sector: 'Agricultura',      pim: 138000000,  devengado: 101000000,  girado: 97000000,   comprometido: 118000000 },
+      { sector: 'Vivienda',         pim: 82000000,   devengado: 49000000,   girado: 47000000,   comprometido: 62000000  },
+    ]},
+    piura:       { nombre: 'Piura',             sectores: [
+      { sector: 'Educación',        pim: 1820000000, devengado: 1548000000, girado: 1510000000, comprometido: 1692000000 },
+      { sector: 'Salud',            pim: 998000000,  devengado: 848000000,  girado: 827000000,  comprometido: 928000000 },
+      { sector: 'Transportes',      pim: 1280000000, devengado: 896000000,  girado: 867000000,  comprometido: 1075000000 },
+      { sector: 'Agricultura',      pim: 395000000,  devengado: 300000000,  girado: 290000000,  comprometido: 348000000 },
+      { sector: 'Vivienda',         pim: 248000000,  devengado: 164000000,  girado: 158000000,  comprometido: 198000000 },
+    ]},
+    puno:        { nombre: 'Puno',              sectores: [
+      { sector: 'Educación',        pim: 1250000000, devengado: 1050000000, girado: 1024000000, comprometido: 1158000000 },
+      { sector: 'Salud',            pim: 685000000,  devengado: 575000000,  girado: 561000000,  comprometido: 635000000 },
+      { sector: 'Transportes',      pim: 980000000,  devengado: 676000000,  girado: 654000000,  comprometido: 808000000 },
+      { sector: 'Agricultura',      pim: 318000000,  devengado: 238000000,  girado: 230000000,  comprometido: 275000000 },
+      { sector: 'Vivienda',         pim: 198000000,  devengado: 126000000,  girado: 122000000,  comprometido: 158000000 },
+    ]},
+    sanmartin:   { nombre: 'San Martín',        sectores: [
+      { sector: 'Educación',        pim: 720000000,  devengado: 612000000,  girado: 597000000,  comprometido: 668000000 },
+      { sector: 'Salud',            pim: 395000000,  devengado: 332000000,  girado: 324000000,  comprometido: 365000000 },
+      { sector: 'Transportes',      pim: 545000000,  devengado: 381000000,  girado: 368000000,  comprometido: 445000000 },
+      { sector: 'Agricultura',      pim: 205000000,  devengado: 154000000,  girado: 149000000,  comprometido: 178000000 },
+      { sector: 'Vivienda',         pim: 118000000,  devengado: 74000000,   girado: 71000000,   comprometido: 92000000  },
+    ]},
+    tacna:       { nombre: 'Tacna',             sectores: [
+      { sector: 'Educación',        pim: 465000000,  devengado: 411000000,  girado: 401000000,  comprometido: 440000000 },
+      { sector: 'Salud',            pim: 255000000,  devengado: 221000000,  girado: 216000000,  comprometido: 240000000 },
+      { sector: 'Transportes',      pim: 380000000,  devengado: 289000000,  girado: 279000000,  comprometido: 330000000 },
+      { sector: 'Agricultura',      pim: 158000000,  devengado: 119000000,  girado: 115000000,  comprometido: 138000000 },
+      { sector: 'Vivienda',         pim: 105000000,  devengado: 72000000,   girado: 69000000,   comprometido: 86000000  },
+    ]},
+    tumbes:      { nombre: 'Tumbes',            sectores: [
+      { sector: 'Educación',        pim: 298000000,  devengado: 256000000,  girado: 250000000,  comprometido: 278000000 },
+      { sector: 'Salud',            pim: 165000000,  devengado: 140000000,  girado: 137000000,  comprometido: 154000000 },
+      { sector: 'Transportes',      pim: 225000000,  devengado: 158000000,  girado: 152000000,  comprometido: 185000000 },
+      { sector: 'Agricultura',      pim: 88000000,   devengado: 66000000,   girado: 64000000,   comprometido: 76000000  },
+      { sector: 'Vivienda',         pim: 68000000,   devengado: 42000000,   girado: 40000000,   comprometido: 52000000  },
+    ]},
+    ucayali:     { nombre: 'Ucayali',           sectores: [
+      { sector: 'Educación',        pim: 565000000,  devengado: 468000000,  girado: 456000000,  comprometido: 520000000 },
+      { sector: 'Salud',            pim: 310000000,  devengado: 255000000,  girado: 249000000,  comprometido: 285000000 },
+      { sector: 'Transportes',      pim: 420000000,  devengado: 285000000,  girado: 276000000,  comprometido: 340000000 },
+      { sector: 'Agricultura',      pim: 158000000,  devengado: 116000000,  girado: 112000000,  comprometido: 136000000 },
+      { sector: 'Vivienda',         pim: 98000000,   devengado: 60000000,   girado: 58000000,   comprometido: 76000000  },
+    ]},
+  }
 };
 
 // ── Helpers ────────────────────────────────────────
@@ -74,41 +263,55 @@ function miniBar(pct) {
 let currentData = [];
 let sortState = { col: null, asc: true };
 
+// ── Mostrar/ocultar filtro de región ────────────────
+function toggleRegionFilter() {
+  const nivel  = document.getElementById('select-nivel').value;
+  const group  = document.getElementById('group-region');
+  const select = document.getElementById('select-region');
+  const show   = nivel === 'regional' || nivel === 'local';
+  group.hidden = !show;
+  if (!show) select.value = '';
+}
+
 // ── Filtrar datos según selección ──────────────────
 function getFilteredData() {
+  const nivel  = document.getElementById('select-nivel').value;
+  const region = document.getElementById('select-region').value;
   const sector = document.getElementById('select-sector').value;
-  let data = [...DEMO_DATA.sectores];
 
-  if (sector) {
-    const map = {
-      educacion: 'Educación',
-      salud: 'Salud',
-      transportes: 'Transportes y Comunicaciones',
-      interior: 'Interior',
-      defensa: 'Defensa',
-      agricultura: 'Agricultura',
-      energia: 'Energía y Minas',
-      vivienda: 'Vivienda',
-      economia: 'Economía y Finanzas',
-      trabajo: 'Trabajo',
-      justicia: 'Justicia',
-      rree: 'Relaciones Exteriores',
-      comercio: 'Comercio Ext. y Turismo',
-      ambiente: 'Ambiente',
-      cultura: 'Cultura',
-      mujer: 'Mujer y Poblac. Vulnerables',
-      produce: 'Producción',
-      desarrollo: 'Desarrollo e Inclusión Social',
-    };
-    data = data.filter(d => d.sector.startsWith(map[sector]?.slice(0, 6) || '___'));
-    if (!data.length) {
-      data = DEMO_DATA.sectores.filter(d =>
-        d.sector.toLowerCase().includes(map[sector]?.toLowerCase().slice(0, 5) || '___')
-      );
+  // Vista por región
+  if ((nivel === 'regional' || nivel === 'local') && region && DEMO_DATA.regiones[region]) {
+    let data = DEMO_DATA.regiones[region].sectores.map(s => ({ ...s }));
+    if (sector) {
+      const sectorNombre = {
+        educacion: 'Educ', salud: 'Salud', transportes: 'Trans',
+        agricultura: 'Agri', vivienda: 'Vivie', ambiente: 'Ambi',
+        cultura: 'Cultu', desarrollo: 'Desar',
+      }[sector] || sector.slice(0, 5);
+      const filtered = data.filter(d => d.sector.toLowerCase().includes(sectorNombre.toLowerCase()));
+      if (filtered.length) data = filtered;
     }
-    if (!data.length) data = DEMO_DATA.sectores.slice(0, 5);
+    return data;
   }
 
+  // Vista nacional (todos los sectores)
+  let data = [...DEMO_DATA.sectores];
+  if (sector) {
+    const map = {
+      educacion: 'Educación', salud: 'Salud',
+      transportes: 'Transportes', interior: 'Interior',
+      defensa: 'Defensa', agricultura: 'Agricultura',
+      energia: 'Energía', vivienda: 'Vivienda',
+      economia: 'Economía', trabajo: 'Trabajo',
+      justicia: 'Justicia', rree: 'Relaciones',
+      comercio: 'Comercio', ambiente: 'Ambiente',
+      cultura: 'Cultura', mujer: 'Mujer',
+      produce: 'Producción', desarrollo: 'Desarrollo',
+    };
+    const kw = map[sector]?.toLowerCase().slice(0, 5) || '___';
+    const filtered = data.filter(d => d.sector.toLowerCase().includes(kw));
+    if (filtered.length) data = filtered;
+  }
   return data;
 }
 
@@ -230,10 +433,12 @@ function consultar() {
     sortState   = { col: null, asc: true };
 
     // Actualizar subtítulo
-    const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\w]+/, '');
+    const region      = document.getElementById('select-region');
+    const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
+    const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
     const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
     document.getElementById('results-subtitle').textContent =
-      `Año ${year} · ${nivelLabel || 'Todos los niveles'} · ${sectorLabel}`;
+      `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
 
     const { totalPIM, totalDevengado } = renderKPIs(currentData);
     renderTable(currentData);
@@ -277,8 +482,10 @@ function shakeElement(el) {
 function resetFilters() {
   document.getElementById('select-year').value   = new Date().getFullYear() - 1;
   document.getElementById('select-nivel').value  = '';
+  document.getElementById('select-region').value = '';
   document.getElementById('select-sector').value = '';
   document.getElementById('select-tipo').value   = '';
+  toggleRegionFilter();
   document.getElementById('empty-state').hidden  = false;
   document.getElementById('results-panel').hidden = true;
   document.getElementById('exec-bar-fill').style.width = '0%';
@@ -390,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-consultar').addEventListener('click', consultar);
   document.getElementById('btn-reset').addEventListener('click', resetFilters);
   document.getElementById('btn-export')?.addEventListener('click', exportCSV);
+  document.getElementById('select-nivel').addEventListener('change', toggleRegionFilter);
 
   attachSortListeners();
   initMobileMenu();

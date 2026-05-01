@@ -481,6 +481,30 @@ img { display: block; max-width: 100%; }
 
 .filter-hint { font-size: 12px; color: var(--gray-400); }
 
+/* Región aparece con animación */
+#group-region:not([hidden]) {
+  animation: slideDown .25s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Aviso de datos ilustrativos */
+.demo-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFF8E1;
+  border: 1px solid #FFD54F;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #5D4037;
+  margin-bottom: 16px;
+}
+.demo-notice strong { font-weight: 600; }
+
 .filters-footer {
   display: flex;
   align-items: center;
