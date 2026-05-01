@@ -411,8 +411,27 @@ function sortBy(col) {
   renderTable(currentData);
 }
 
+// ── Fuente de datos actual ─────────────────────────
+let dataSource = 'demo'; // 'demo' | 'oficial'
+
+function setBadgeFuente(fuente) {
+  const notice = document.querySelector('.demo-notice');
+  if (!notice) return;
+  if (fuente === 'oficial') {
+    notice.style.background  = '#E8F5E9';
+    notice.style.borderColor = '#81C784';
+    notice.style.color       = '#1B5E20';
+    notice.innerHTML = '✅ <span><strong>Datos oficiales</strong> obtenidos en tiempo real desde <a href="https://www.datosabiertos.gob.pe" target="_blank" rel="noopener">datosabiertos.gob.pe</a></span>';
+  } else {
+    notice.style.background  = '';
+    notice.style.borderColor = '';
+    notice.style.color       = '';
+    notice.innerHTML = '⚠️ <span><strong>Datos ilustrativos:</strong> Esta demo muestra la estructura real del SIAF-MEF pero con valores de referencia. Para datos oficiales visita <a href="https://apps5.mineco.gob.pe/transparencia/Navegador/Default.aspx" target="_blank" rel="noopener">apps5.mineco.gob.pe</a>.</span>';
+  }
+}
+
 // ── Consultar ──────────────────────────────────────
-function consultar() {
+async function consultar() {
   const year   = document.getElementById('select-year').value;
   const nivel  = document.getElementById('select-nivel');
   const sector = document.getElementById('select-sector');
@@ -427,37 +446,46 @@ function consultar() {
   btn.classList.add('loading');
   btn.textContent = '';
 
-  // Simular latencia de API
-  setTimeout(() => {
-    currentData = getFilteredData();
-    sortState   = { col: null, asc: true };
+  // Intentar API oficial primero
+  try {
+    const resultado = await cargarDatosOficiales({ anio: year });
 
-    // Actualizar subtítulo
-    const region      = document.getElementById('select-region');
-    const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
-    const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
-    const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
-    document.getElementById('results-subtitle').textContent =
-      `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
+    if (resultado.fuente === 'oficial' && resultado.datos?.length) {
+      currentData = resultado.datos;
+      dataSource  = 'oficial';
+    } else {
+      throw new Error('sin datos oficiales');
+    }
+  } catch {
+    currentData = getFilteredData(); // fallback a demo
+    dataSource  = 'demo';
+  }
 
-    const { totalPIM, totalDevengado } = renderKPIs(currentData);
-    renderTable(currentData);
+  sortState = { col: null, asc: true };
 
-    // Mostrar resultados
-    document.getElementById('empty-state').hidden  = true;
-    document.getElementById('results-panel').hidden = false;
+  // Actualizar subtítulo y badge de fuente
+  const region      = document.getElementById('select-region');
+  const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
+  const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
+  const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
+  document.getElementById('results-subtitle').textContent =
+    `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
 
-    // Scroll suave a resultados
-    document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setBadgeFuente(dataSource);
+  renderKPIs(currentData);
+  renderTable(currentData);
 
-    btn.classList.remove('loading');
-    btn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="2"/>
-        <path d="M12.5 12.5L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      Consultar ahora`;
-  }, 700);
+  document.getElementById('empty-state').hidden   = true;
+  document.getElementById('results-panel').hidden  = false;
+  document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  btn.classList.remove('loading');
+  btn.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="2"/>
+      <path d="M12.5 12.5L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Consultar ahora`;
 }
 
 // ── Animación de error ─────────────────────────────
@@ -568,6 +596,51 @@ function initKeyboardShortcuts() {
       if (e.key === 'Enter') consultar();
     });
   });
+}
+
+// ── API oficial — datosabiertos.gob.pe (CKAN) ──────
+//
+//  Cómo obtener el resource_id correcto:
+//  1. Ve a https://www.datosabiertos.gob.pe/organization/mef
+//  2. Busca "Ejecución Presupuestal" o "SIAF"
+//  3. Abre el dataset → click en el recurso JSON/CSV
+//  4. Copia el UUID de la URL → pégalo en RESOURCE_IDS abajo
+//
+const CKAN_API   = 'https://www.datosabiertos.gob.pe/api/3/action';
+const RESOURCE_IDS = {
+  // Reemplazar con los IDs reales de datosabiertos.gob.pe
+  2024: 'REEMPLAZAR-CON-ID-REAL-2024',
+  2023: 'REEMPLAZAR-CON-ID-REAL-2023',
+  2022: 'REEMPLAZAR-CON-ID-REAL-2022',
+};
+
+async function cargarDatosOficiales({ anio } = {}) {
+  const resourceId = RESOURCE_IDS[anio];
+  if (!resourceId || resourceId.startsWith('REEMPLAZAR')) {
+    return { fuente: 'demo', datos: null };
+  }
+
+  try {
+    const url = `${CKAN_API}/datastore_search?resource_id=${resourceId}&limit=100`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const json = await res.json();
+    if (!json.success || !json.result?.records?.length) throw new Error('Sin datos');
+
+    const datos = json.result.records.map(r => ({
+      sector:       r['SECTOR']       || r['sector']       || r['PLIEGO']       || 'Sin nombre',
+      pim:          Number(r['PIM']         || r['pim']         || 0),
+      devengado:    Number(r['DEVENGADO']   || r['devengado']   || 0),
+      girado:       Number(r['GIRADO']      || r['girado']      || 0),
+      comprometido: Number(r['COMPROMETIDO']|| r['comprometido']|| 0),
+    })).filter(r => r.pim > 0);
+
+    return { fuente: 'oficial', datos };
+  } catch (err) {
+    console.warn('[API] Fallback a demo:', err.message);
+    return { fuente: 'demo', datos: null };
+  }
 }
 
 // ── Intersección observer para animaciones ─────────
