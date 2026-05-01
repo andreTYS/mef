@@ -57,11 +57,41 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Botones de drill-down del portal SIAF
+const DIMENSIONES = {
+  gobierno:    'ctl00$CPH1$BtnTipoGobierno',
+  funcion:     'ctl00$CPH1$BtnFuncion',
+  departamento:'ctl00$CPH1$BtnDepartamentoMeta',
+  generica:    'ctl00$CPH1$BtnGenerica',
+  fuente:      'ctl00$CPH1$BtnFuenteAgregada',
+  categoria:   'ctl00$CPH1$BtnProgramaPpto',
+};
+
+// Headers comunes para simular navegador real
+function headersNavegador(anio) {
+  return {
+    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'es-PE,es;q=0.9',
+    'Referer':         `https://apps5.mineco.gob.pe/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`,
+    'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+  };
+}
+
+// Extrae ViewState y EventValidation del HTML (necesarios para el POST)
+function extraerTokensASP(html) {
+  const $ = cheerio.load(html);
+  return {
+    viewstate:       $('#__VIEWSTATE').val()       || '',
+    eventvalidation: $('#__EVENTVALIDATION').val() || '',
+    cookieHeader:    '',
+  };
+}
+
 // ── GET /api/consulta — consulta principal ─────────
 // Parámetros:
 //   anio  : 2009–2025  (requerido)
-//   dim   : dimensión de drill-down
-//           'gobierno' | 'funcion' | 'departamento' | 'generica'
+//   dim   : 'gobierno' | 'funcion' | 'departamento' | 'generica' | 'fuente' | 'categoria'
+//           Si se omite, devuelve solo el TOTAL general
 app.get('/api/consulta', async (req, res) => {
   const { anio = 2024, dim = '' } = req.query;
 
@@ -72,26 +102,56 @@ app.get('/api/consulta', async (req, res) => {
     return res.json({ fuente: 'siaf-mef', cached: true, ...cached });
   }
 
-  try {
-    // URL real del portal SIAF (confirmada desde DevTools)
-    const url = `/transparencia/Navegador/Navegar_7.aspx?y=${anio}&ap=ActProy`;
-    console.log(`[MEF] GET ${url}`);
+  const siafUrl = `/transparencia/Navegador/Navegar_7.aspx?y=${anio}&ap=ActProy`;
 
-    const response = await mefClient.get(url, {
+  try {
+    // ── Paso 1: GET inicial para obtener ViewState y cookies ──
+    console.log(`[MEF] GET ${siafUrl}`);
+    const getResp = await mefClient.get(siafUrl, { headers: headersNavegador(anio) });
+
+    // Si no se pidió drill-down, devolver el TOTAL directamente
+    if (!dim || !DIMENSIONES[dim]) {
+      const data = parsearSIAF(getResp.data, anio);
+      cache.set(cacheKey, data);
+      return res.json({ fuente: 'siaf-mef', cached: false, ...data });
+    }
+
+    // ── Paso 2: extraer tokens ASP.NET para el POST ──
+    const tokens  = extraerTokensASP(getResp.data);
+    const cookies = (getResp.headers['set-cookie'] || []).join('; ');
+    const boton   = DIMENSIONES[dim];
+
+    console.log(`[MEF] POST drill-down: ${dim} → ${boton}`);
+
+    // ── Paso 3: POST simulando click en el botón de dimensión ──
+    const formData = new URLSearchParams({
+      '__EVENTTARGET':    '',
+      '__EVENTARGUMENT':  '',
+      '__VIEWSTATE':      tokens.viewstate,
+      '__EVENTVALIDATION':tokens.eventvalidation,
+      [boton]:            boton.includes('BtnTipoGobierno') ? 'Nivel de Gobierno'
+                        : boton.includes('BtnFuncion')      ? 'Función'
+                        : boton.includes('BtnDepartamento') ? 'Departamento'
+                        : boton.includes('BtnGenerica')     ? 'Genérica'
+                        : boton.includes('BtnFuente')       ? 'Fuente'
+                        : 'Categoría Presupuestal',
+    });
+
+    const postResp = await mefClient.post(siafUrl, formData.toString(), {
       headers: {
-        // Simular navegador real para evitar bloqueo Imperva
-        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'es-PE,es;q=0.9',
-        'Referer':         `https://apps5.mineco.gob.pe/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`,
+        ...headersNavegador(anio),
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie':        cookies,
       },
     });
 
-    const data = parsearSIAF(response.data, anio);
+    const data = parsearSIAF(postResp.data, anio);
+    data.dimension = dim;
 
     if (!data.detalle.length) {
       return res.status(502).json({
-        error: 'El SIAF no devolvió datos para ese año',
-        sugerencia: 'Intenta con otro año o revisa la conexión',
+        error: 'El SIAF no devolvió registros de detalle',
+        sugerencia: 'Prueba sin el parámetro dim= para ver el TOTAL',
       });
     }
 
@@ -103,7 +163,7 @@ app.get('/api/consulta', async (req, res) => {
     res.status(502).json({
       error:      'No se pudo conectar con el SIAF-MEF',
       detalle:    err.message,
-      sugerencia: 'Verifica tu conexión a internet o intenta más tarde',
+      sugerencia: 'Verifica tu conexión o intenta más tarde',
     });
   }
 });
