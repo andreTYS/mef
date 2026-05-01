@@ -59,14 +59,13 @@ app.get('/api/status', (req, res) => {
 
 // ── GET /api/consulta — consulta principal ─────────
 // Parámetros:
-//   anio    : 2009–2025  (requerido)
-//   nivel   : 'N' (Nacional) | 'R' (Regional) | 'L' (Local)
-//   region  : código ubigeo de región (ej: '150000' = Lima)
-//   sector  : código de sector (ej: '010' = Presidencia)
+//   anio  : 2009–2025  (requerido)
+//   dim   : dimensión de drill-down
+//           'gobierno' | 'funcion' | 'departamento' | 'generica'
 app.get('/api/consulta', async (req, res) => {
-  const { anio = 2024, nivel = '', region = '', sector = '' } = req.query;
+  const { anio = 2024, dim = '' } = req.query;
 
-  const cacheKey = `consulta_${anio}_${nivel}_${region}_${sector}`;
+  const cacheKey = `consulta_${anio}_${dim}`;
   const cached   = cache.get(cacheKey);
   if (cached) {
     console.log(`[cache hit] ${cacheKey}`);
@@ -74,20 +73,27 @@ app.get('/api/consulta', async (req, res) => {
   }
 
   try {
-    // El portal SIAF usa parámetros en la URL para filtrar
-    const params = new URLSearchParams({
-      y:  anio,
-      ap: 'ActProy',                   // Actividades y Proyectos
-      ...(nivel  && { n: nivel  }),
-      ...(region && { r: region }),
-      ...(sector && { s: sector }),
+    // URL real del portal SIAF (confirmada desde DevTools)
+    const url = `/transparencia/Navegador/Navegar_7.aspx?y=${anio}&ap=ActProy`;
+    console.log(`[MEF] GET ${url}`);
+
+    const response = await mefClient.get(url, {
+      headers: {
+        // Simular navegador real para evitar bloqueo Imperva
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'es-PE,es;q=0.9',
+        'Referer':         `https://apps5.mineco.gob.pe/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`,
+      },
     });
 
-    const url = `/transparencia/Navegador/Default.aspx?${params}`;
-    console.log(`[MEF] Fetching: ${url}`);
+    const data = parsearSIAF(response.data, anio);
 
-    const response = await mefClient.get(url);
-    const data     = parsearSIAF(response.data, anio);
+    if (!data.detalle.length) {
+      return res.status(502).json({
+        error: 'El SIAF no devolvió datos para ese año',
+        sugerencia: 'Intenta con otro año o revisa la conexión',
+      });
+    }
 
     cache.set(cacheKey, data);
     res.json({ fuente: 'siaf-mef', cached: false, ...data });
@@ -95,9 +101,9 @@ app.get('/api/consulta', async (req, res) => {
   } catch (err) {
     console.error('[MEF] Error:', err.message);
     res.status(502).json({
-      error:   'No se pudo conectar con el SIAF-MEF',
-      detalle: err.message,
-      sugerencia: 'Verifica la conexión a internet o intenta más tarde',
+      error:      'No se pudo conectar con el SIAF-MEF',
+      detalle:    err.message,
+      sugerencia: 'Verifica tu conexión a internet o intenta más tarde',
     });
   }
 });
@@ -126,46 +132,76 @@ app.delete('/api/cache', (req, res) => {
 
 // ══════════════════════════════════════════════════
 //  PARSER HTML DEL SIAF
-//  El portal devuelve HTML con tablas; extraemos los datos.
-//  Si el MEF expone endpoints JSON en el futuro, solo
-//  hay que cambiar esta función.
+//
+//  Estructura confirmada del HTML real (Navegar_7.aspx):
+//
+//  <table class="Data">
+//    <tr id="tr0">
+//      <td>  ← radio button con aria-label que contiene todos los valores
+//        <input type="radio" name="grp1"
+//          aria-label="TOTAL,
+//            PIA: 214,790,274,052,
+//            PIM: 249,947,413,952,
+//            CERTIFICACION: 235,745,027,380,
+//            COMPROMISO ANUAL: 228,519,173,098,
+//            COMPROMISO MENSUAL: 225,800,663,054
+//            DEVENGADO: 222,984,118,825
+//            GIRADO: 222,586,906,762
+//            PORCENTAJE AVANCE: 89.2"
+//        />
+//      </td>
+//      <td>TOTAL</td>       ← concepto (nombre)
+//      <td>214,790,274,052  ← PIA
+//      <td>249,947,413,952  ← PIM
+//      <td>235,745,027,380  ← Certificación
+//      <td>228,519,173,098  ← Compromiso Anual
+//      <td>225,800,663,054  ← Compromiso Mensual
+//      <td>222,984,118,825  ← Devengado
+//      <td>222,586,906,762  ← Girado
+//      <td>89.2             ← Avance %
+//    </tr>
+//  </table>
 // ══════════════════════════════════════════════════
 
 function parsearSIAF(html, anio) {
-  const $ = cheerio.load(html);
+  const $     = cheerio.load(html);
   const filas = [];
 
-  // El portal SIAF tiene una tabla con id 'tbl_resumen' o similar
-  // Ajustar el selector según la respuesta real del portal
-  $('table tr').each((i, tr) => {
-    if (i === 0) return; // saltar header
+  // Función auxiliar: limpia texto con comas y espacios → número
+  const num = (txt) => {
+    const clean = String(txt).trim().replace(/,/g, '').replace(/\s/g, '');
+    return parseFloat(clean) || 0;
+  };
 
+  // Extrae metadatos útiles del HTML
+  const lastUpdate = $('#ctl00_CPH1_LblLastUpdate').text().trim();
+
+  // Itera sobre las filas de la tabla de datos (class="Data")
+  $('table.Data tr').each((i, tr) => {
     const celdas = $(tr).find('td');
-    if (celdas.length < 5) return;
+    if (celdas.length < 8) return;
 
-    const limpiar = (txt) => Number(
-      $(txt).text().trim()
-        .replace(/\s/g, '')
-        .replace(/,/g, '')
-        .replace(/[^\d.]/g, '')
-    ) || 0;
+    // El nombre del concepto está en la segunda celda (índice 1)
+    const concepto = $(celdas[1]).text().trim();
+    if (!concepto) return;
 
-    const sector = $(celdas[1]).text().trim();
-    if (!sector) return;
-
+    // Los valores numéricos están en las celdas 2-9
     filas.push({
-      sector,
-      pia:          limpiar(celdas[2]),
-      pim:          limpiar(celdas[3]),
-      comprometido: limpiar(celdas[4]),
-      devengado:    limpiar(celdas[5]),
-      girado:       limpiar(celdas[6]),
-      avance:       limpiar(celdas[7]),
+      sector:           concepto,
+      pia:              num($(celdas[2]).text()),
+      pim:              num($(celdas[3]).text()),
+      certificacion:    num($(celdas[4]).text()),
+      comprometido:     num($(celdas[5]).text()),
+      compromiso_mens:  num($(celdas[6]).text()),
+      devengado:        num($(celdas[7]).text()),
+      girado:           num($(celdas[8]).text()),
+      avance_pct:       num($(celdas[9]).text()),
     });
   });
 
   return {
     anio,
+    ultima_actualizacion: lastUpdate,
     total_registros: filas.length,
     resumen: calcularResumen(filas),
     detalle: filas,
@@ -177,10 +213,12 @@ function calcularResumen(filas) {
   const pim       = sum('pim');
   const devengado = sum('devengado');
   return {
+    pia:          sum('pia'),
     pim,
+    certificacion: sum('certificacion'),
+    comprometido: sum('comprometido'),
     devengado,
     girado:       sum('girado'),
-    comprometido: sum('comprometido'),
     avance_pct:   pim > 0 ? Math.round((devengado / pim) * 1000) / 10 : 0,
   };
 }
