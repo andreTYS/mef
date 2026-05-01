@@ -598,45 +598,35 @@ function initKeyboardShortcuts() {
   });
 }
 
-// ── API oficial — datosabiertos.gob.pe (CKAN) ──────
+// ── API oficial — servidor Node proxy ──────────────
 //
-//  Cómo obtener el resource_id correcto:
-//  1. Ve a https://www.datosabiertos.gob.pe/organization/mef
-//  2. Busca "Ejecución Presupuestal" o "SIAF"
-//  3. Abre el dataset → click en el recurso JSON/CSV
-//  4. Copia el UUID de la URL → pégalo en RESOURCE_IDS abajo
+//  Cuando corres "node server.js", el frontend llama
+//  al proxy local que consulta el SIAF-MEF por ti.
 //
-const CKAN_API   = 'https://www.datosabiertos.gob.pe/api/3/action';
-const RESOURCE_IDS = {
-  // Reemplazar con los IDs reales de datosabiertos.gob.pe
-  2024: 'REEMPLAZAR-CON-ID-REAL-2024',
-  2023: 'REEMPLAZAR-CON-ID-REAL-2023',
-  2022: 'REEMPLAZAR-CON-ID-REAL-2022',
-};
+const API_BASE = window.location.port === '3000'
+  ? ''           // mismo servidor Node
+  : null;        // sin Node → usar demo
 
-async function cargarDatosOficiales({ anio } = {}) {
-  const resourceId = RESOURCE_IDS[anio];
-  if (!resourceId || resourceId.startsWith('REEMPLAZAR')) {
+async function cargarDatosOficiales({ anio, nivel, region, sector } = {}) {
+  if (!API_BASE && API_BASE !== '') {
     return { fuente: 'demo', datos: null };
   }
 
   try {
-    const url = `${CKAN_API}/datastore_search?resource_id=${resourceId}&limit=100`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const params = new URLSearchParams({ anio });
+    if (nivel)  params.set('nivel',  nivel);
+    if (region) params.set('region', region);
+    if (sector) params.set('sector', sector);
+
+    const res  = await fetch(`${API_BASE}/api/consulta?${params}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
 
     const json = await res.json();
-    if (!json.success || !json.result?.records?.length) throw new Error('Sin datos');
+    if (!json.detalle?.length) throw new Error('Sin registros');
 
-    const datos = json.result.records.map(r => ({
-      sector:       r['SECTOR']       || r['sector']       || r['PLIEGO']       || 'Sin nombre',
-      pim:          Number(r['PIM']         || r['pim']         || 0),
-      devengado:    Number(r['DEVENGADO']   || r['devengado']   || 0),
-      girado:       Number(r['GIRADO']      || r['girado']      || 0),
-      comprometido: Number(r['COMPROMETIDO']|| r['comprometido']|| 0),
-    })).filter(r => r.pim > 0);
-
-    return { fuente: 'oficial', datos };
+    return { fuente: 'oficial', datos: json.detalle, resumen: json.resumen };
   } catch (err) {
     console.warn('[API] Fallback a demo:', err.message);
     return { fuente: 'demo', datos: null };
