@@ -456,60 +456,68 @@ async function consultar() {
 
   const btn = document.getElementById('btn-consultar');
   btn.classList.add('loading');
+  btn.disabled = true;
   btn.textContent = '';
 
-  // Intentar API oficial primero
+  const btnRestore = () => {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="2"/>
+        <path d="M12.5 12.5L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Consultar ahora`;
+  };
+
+  let resultado = null;
+
   try {
-    const resultado = await cargarDatosOficiales({ anio: year });
+    // Intentar API oficial primero
+    resultado = await cargarDatosOficiales({
+      anio:   year,
+      nivel:  nivel.value,
+      sector: sector.value,
+    });
 
     if (resultado.fuente === 'oficial' && resultado.datos?.length) {
       currentData = resultado.datos;
       dataSource  = 'oficial';
     } else {
-      throw new Error('sin datos oficiales');
+      currentData = getFilteredData();
+      dataSource  = 'demo';
     }
-  } catch {
-    currentData = getFilteredData(); // fallback a demo
-    dataSource  = 'demo';
+
+    sortState = { col: null, asc: true };
+
+    // Subtítulo
+    const region      = document.getElementById('select-region');
+    const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
+    const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
+    const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
+    let subtitulo = `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
+    if (resultado?.ultimaActualizacion) subtitulo += ` · Act: ${resultado.ultimaActualizacion}`;
+    document.getElementById('results-subtitle').textContent = subtitulo;
+
+    setBadgeFuente(dataSource);
+
+    if (dataSource === 'oficial' && resultado?.resumen) {
+      renderKPIsFromResumen(resultado.resumen);
+    } else {
+      renderKPIs(currentData);
+    }
+    renderTable(currentData);
+
+    document.getElementById('empty-state').hidden  = true;
+    document.getElementById('results-panel').hidden = false;
+    document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch (err) {
+    console.error('[consultar]', err);
+  } finally {
+    // El botón SIEMPRE se restaura, pase lo que pase
+    btnRestore();
   }
-
-  sortState = { col: null, asc: true };
-
-  // Actualizar subtítulo y badge de fuente
-  const region      = document.getElementById('select-region');
-  const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
-  const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
-  const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
-  document.getElementById('results-subtitle').textContent =
-    `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
-
-  // Mostrar fecha de actualización oficial si está disponible
-  if (resultado?.ultimaActualizacion) {
-    document.getElementById('results-subtitle').textContent +=
-      ` · Actualizado: ${resultado.ultimaActualizacion}`;
-  }
-
-  setBadgeFuente(dataSource);
-
-  // Si tenemos resumen oficial usarlo para los KPIs (más preciso que sumar filas)
-  if (dataSource === 'oficial' && resultado?.resumen) {
-    renderKPIsFromResumen(resultado.resumen);
-  } else {
-    renderKPIs(currentData);
-  }
-  renderTable(currentData);
-
-  document.getElementById('empty-state').hidden   = true;
-  document.getElementById('results-panel').hidden  = false;
-  document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  btn.classList.remove('loading');
-  btn.innerHTML = `
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="2"/>
-      <path d="M12.5 12.5L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    Consultar ahora`;
 }
 
 // ── Animación de error ─────────────────────────────
