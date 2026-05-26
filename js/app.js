@@ -835,6 +835,25 @@ function initScrollAnimations() {
   });
 }
 
+// ── Tema claro/oscuro ──────────────────────────────
+function initThemeToggle() {
+  const btn   = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const saved = localStorage.getItem('theme') || 'dark';
+  const apply = (theme) => {
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+    btn.textContent = theme === 'light' ? '🌙' : '☀️';
+    btn.setAttribute('aria-label', theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+  };
+  apply(saved);
+  btn.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const next = isLight ? 'dark' : 'light';
+    apply(next);
+    localStorage.setItem('theme', next);
+  });
+}
+
 // ── Init ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-consultar').addEventListener('click', consultar);
@@ -847,6 +866,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileMenu();
   initKeyboardShortcuts();
   initScrollAnimations();
+  initThemeToggle();
 
   // Hero stats: datos reales si hay servidor, animación si no
   cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));
