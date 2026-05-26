@@ -474,9 +474,11 @@ async function consultar() {
 
   try {
     // Intentar API oficial primero
+    const region = document.getElementById('select-region');
     resultado = await cargarDatosOficiales({
       anio:   year,
       nivel:  nivel.value,
+      region: region.value,
       sector: sector.value,
     });
 
@@ -507,6 +509,7 @@ async function consultar() {
       renderKPIs(currentData);
     }
     renderTable(currentData);
+    renderChart(currentData);
 
     document.getElementById('empty-state').hidden  = true;
     document.getElementById('results-panel').hidden = false;
@@ -633,65 +636,169 @@ function initKeyboardShortcuts() {
 // ── API oficial — servidor Node proxy ──────────────
 const API_BASE = window.location.port === '3000' ? '' : null;
 
+// ── Mapa región selector → palabra clave SIAF ──────
+const REGION_SIAF = {
+  amazonas: 'AMAZONAS', ancash: 'ANCASH', apurimac: 'APURIMAC',
+  arequipa: 'AREQUIPA', ayacucho: 'AYACUCHO', cajamarca: 'CAJAMARCA',
+  callao: 'CALLAO', cusco: 'CUSCO', huancavelica: 'HUANCAVELICA',
+  huanuco: 'HUANUCO', ica: 'ICA', junin: 'JUNIN',
+  lalibertad: 'LA LIBERTAD', lambayeque: 'LAMBAYEQUE',
+  lima: 'LIMA', limaregion: 'LIMA', loreto: 'LORETO',
+  madrededios: 'MADRE DE DIOS', moquegua: 'MOQUEGUA', pasco: 'PASCO',
+  piura: 'PIURA', puno: 'PUNO', sanmartin: 'SAN MARTIN',
+  tacna: 'TACNA', tumbes: 'TUMBES', ucayali: 'UCAYALI',
+};
+
 // Limpia prefijos del SIAF: "E: GOBIERNO NACIONAL" → "Gobierno Nacional"
 function limpiarNombre(nombre) {
   return nombre
-    .replace(/^[A-Z0-9]+:\s*/,  '')      // quita "E: ", "M: ", "R: ", "01 ", etc.
+    .replace(/^[A-Z0-9]+:\s*/, '')
     .replace(/GOBIERNOS?\s+/gi, 'Gob. ')
-    .replace(/\b(\w)/g, c => c.toUpperCase())
-    .replace(/\bDe\b/g, 'de')
+    .replace(/\b(\w+)/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .replace(/\bDe\b/g, 'de').replace(/\bY\b/g, 'y').replace(/\bDel\b/g, 'del')
     .trim();
 }
 
-// Elige la dimensión de drill-down según los filtros del usuario
-function elegirDimension(nivel, sector) {
-  if (sector)                              return 'funcion';
-  if (nivel === 'nacional')                return 'gobierno';
-  if (nivel === 'regional' || nivel === 'local') return 'gobierno';
-  return 'gobierno'; // default: desglose por nivel de gobierno
+// Elige dimensión según filtros
+function elegirDimension(nivel, region, sector) {
+  if (region)  return 'departamento';
+  if (sector)  return 'funcion';
+  return 'gobierno';
 }
 
-// Filtra las filas del API según el nivel elegido
+// Filtra por nivel de gobierno
 function filtrarPorNivel(detalle, nivel) {
   if (!nivel) return detalle;
-  const mapa = {
-    nacional: 'NACIONAL',
-    regional: 'REGIONAL',
-    local:    'LOCAL',
-  };
+  const mapa = { nacional: 'NACIONAL', regional: 'REGIONAL', local: 'LOCAL' };
   const kw = mapa[nivel];
-  if (!kw) return detalle;
+  return kw ? detalle.filter(d => d.sector.toUpperCase().includes(kw)) : detalle;
+}
+
+// Filtra por región (departamento)
+function filtrarPorRegion(detalle, region) {
+  if (!region || !REGION_SIAF[region]) return detalle;
+  const kw = REGION_SIAF[region];
   return detalle.filter(d => d.sector.toUpperCase().includes(kw));
 }
 
-async function cargarDatosOficiales({ anio, nivel, sector } = {}) {
+async function cargarDatosOficiales({ anio, nivel, region, sector } = {}) {
   if (API_BASE === null) return { fuente: 'demo', datos: null };
 
   try {
-    const dim    = elegirDimension(nivel, sector);
+    const dim    = elegirDimension(nivel, region, sector);
     const params = new URLSearchParams({ anio, dim });
     const res    = await fetch(`${API_BASE}/api/consulta?${params}`, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const json = await res.json();
     if (!json.detalle?.length) throw new Error('Sin registros');
 
-    // Filtrar y normalizar nombres
-    let detalle = filtrarPorNivel(json.detalle, nivel);
+    let detalle = json.detalle;
+    if (region) detalle = filtrarPorRegion(detalle, region);
+    else        detalle = filtrarPorNivel(detalle, nivel);
+
     detalle = detalle.map(d => ({ ...d, sector: limpiarNombre(d.sector) }));
 
     return {
-      fuente:           'oficial',
-      datos:            detalle,
-      resumen:          json.resumen,
+      fuente:              'oficial',
+      datos:               detalle,
+      resumen:             json.resumen,
       ultimaActualizacion: json.ultima_actualizacion,
     };
   } catch (err) {
     console.warn('[API] Fallback a demo:', err.message);
     return { fuente: 'demo', datos: null };
   }
+}
+
+// ── Gráfico de barras ──────────────────────────────
+function renderChart(data) {
+  const container = document.getElementById('bar-chart');
+  if (!container) return;
+
+  const maxPIM = Math.max(...data.map(d => d.pim), 1);
+  const HEIGHT = 180; // px altura máxima de barras
+
+  const tooltip = document.getElementById('chart-tooltip');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'chart-bars';
+
+  data.forEach(row => {
+    const pct    = fmt.pctNum(row.devengado, row.pim);
+    const hPIM   = Math.round((row.pim       / maxPIM) * HEIGHT);
+    const hDev   = Math.round((row.devengado / maxPIM) * HEIGHT);
+    const label  = row.sector.length > 14
+      ? row.sector.slice(0, 13) + '…'
+      : row.sector;
+
+    const group = document.createElement('div');
+    group.className = 'chart-bar-group';
+    group.innerHTML = `
+      <span class="chart-bar-pct">${pct}%</span>
+      <div class="chart-bar-pair">
+        <div class="chart-bar chart-bar--pim" style="height:${hPIM}px"
+          data-tip="${row.sector} — PIM: ${fmt.currency(row.pim)}"></div>
+        <div class="chart-bar chart-bar--dev" style="height:${hDev}px"
+          data-tip="${row.sector} — Devengado: ${fmt.currency(row.devengado)} (${pct}%)"></div>
+      </div>
+      <span class="chart-bar-label">${label}</span>
+    `;
+    wrap.appendChild(group);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(wrap);
+
+  // Tooltip hover
+  container.querySelectorAll('.chart-bar').forEach(bar => {
+    bar.addEventListener('mousemove', e => {
+      tooltip.textContent = bar.dataset.tip;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top  = (e.clientY - 32) + 'px';
+    });
+    bar.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  });
+}
+
+// ── Hero stats dinámicos ───────────────────────────
+async function cargarHeroStats() {
+  if (API_BASE === null) return; // solo si hay servidor Node
+  try {
+    const anio = new Date().getFullYear() - 1;
+    const res  = await fetch(`${API_BASE}/api/consulta?anio=${anio}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    if (!json.resumen) return;
+
+    const { pim, avance_pct } = json.resumen;
+    const elPIM  = document.getElementById('stat-pim');
+    const elAvance = document.getElementById('stat-ejecucion');
+
+    if (elPIM) elPIM.textContent = fmt.currency(pim);
+    if (elAvance) {
+      // Animar hacia el valor real
+      const target = avance_pct;
+      let current  = 0;
+      const step   = target / 40;
+      const timer  = setInterval(() => {
+        current = Math.min(current + step, target);
+        elAvance.textContent = current.toFixed(1) + '%';
+        if (current >= target) clearInterval(timer);
+      }, 30);
+    }
+
+    // Actualizar año en el stat
+    const elAnio = document.querySelector('.hero-stat span');
+    if (elAnio && elAnio.textContent.includes('Presupuesto')) {
+      elAnio.textContent = `Presupuesto ${anio}`;
+    }
+  } catch { /* silencioso — el hero se queda con valores por defecto */ }
 }
 
 // ── Intersección observer para animaciones ─────────
@@ -728,8 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
   initScrollAnimations();
 
+  // Hero stats: datos reales si hay servidor, animación si no
+  cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));
   setTimeout(animateHeroNumbers, 600);
-
-  // Consulta inicial automática con el año pre-seleccionado
-  setTimeout(consultar, 300);
 });
