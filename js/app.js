@@ -473,12 +473,11 @@ async function consultar() {
   let resultado = null;
 
   try {
-    // Intentar API oficial primero
-    const region = document.getElementById('select-region');
+    const regionEl = document.getElementById('select-region');
     resultado = await cargarDatosOficiales({
       anio:   year,
       nivel:  nivel.value,
-      region: region.value,
+      region: regionEl.value,
       sector: sector.value,
     });
 
@@ -493,9 +492,8 @@ async function consultar() {
     sortState = { col: null, asc: true };
 
     // Subtítulo
-    const region      = document.getElementById('select-region');
     const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
-    const regionLabel = region.value ? ` · ${region.options[region.selectedIndex].text}` : '';
+    const regionLabel = regionEl.value ? ` · ${regionEl.options[regionEl.selectedIndex].text}` : '';
     const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
     let subtitulo = `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
     if (resultado?.ultimaActualizacion) subtitulo += ` · Act: ${resultado.ultimaActualizacion}`;
