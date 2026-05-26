@@ -269,8 +269,22 @@ function toggleRegionFilter() {
   const group  = document.getElementById('group-region');
   const select = document.getElementById('select-region');
   const show   = nivel === 'regional' || nivel === 'local';
-  group.hidden = !show;
-  if (!show) select.value = '';
+
+  if (show) {
+    group.hidden = false;
+    // Pequeña animación de entrada
+    group.style.opacity   = '0';
+    group.style.transform = 'translateY(-6px)';
+    requestAnimationFrame(() => {
+      group.style.transition = 'opacity .25s ease, transform .25s ease';
+      group.style.opacity    = '1';
+      group.style.transform  = 'translateY(0)';
+    });
+  } else {
+    group.hidden  = true;
+    select.value  = '';
+    group.style.transition = '';
+  }
 }
 
 // ── Filtrar datos según selección ──────────────────
@@ -542,11 +556,11 @@ function shakeElement(el) {
 // ── Limpiar filtros ────────────────────────────────
 function resetFilters() {
   document.getElementById('select-year').value   = new Date().getFullYear() - 1;
-  document.getElementById('select-nivel').value  = '';
+  document.getElementById('select-nivel').value  = 'nacional'; // vuelve al default
   document.getElementById('select-region').value = '';
   document.getElementById('select-sector').value = '';
   document.getElementById('select-tipo').value   = '';
-  toggleRegionFilter();
+  toggleRegionFilter(); // oculta región porque nacional no la necesita
   document.getElementById('empty-state').hidden  = false;
   document.getElementById('results-panel').hidden = true;
   document.getElementById('exec-bar-fill').style.width = '0%';
@@ -828,6 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-export')?.addEventListener('click', exportCSV);
   document.getElementById('select-nivel').addEventListener('change', toggleRegionFilter);
 
+  toggleRegionFilter(); // ocultar región al inicio (Nacional preseleccionado)
   attachSortListeners();
   initMobileMenu();
   initKeyboardShortcuts();
