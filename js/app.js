@@ -861,6 +861,78 @@ function initThemeToggle() {
   });
 }
 
+// ── Chatbot ────────────────────────────────────────
+function initChatbot() {
+  const fab      = document.getElementById('chat-fab');
+  const panel    = document.getElementById('chat-panel');
+  const closeBtn = document.getElementById('chat-close');
+  const form     = document.getElementById('chat-form');
+  const input    = document.getElementById('chat-input');
+  const msgList  = document.getElementById('chat-messages');
+  if (!fab || !panel) return;
+
+  let history = [];
+
+  function togglePanel(open) {
+    panel.hidden = !open;
+    fab.setAttribute('aria-expanded', String(open));
+    if (open) input.focus();
+  }
+
+  fab.addEventListener('click', () => togglePanel(panel.hidden));
+  closeBtn.addEventListener('click', () => togglePanel(false));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !panel.hidden) togglePanel(false);
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    input.disabled = true;
+
+    appendMsg('user', text);
+    history.push({ role: 'user', content: text });
+
+    const typing = appendMsg('bot', '· · ·', true);
+
+    try {
+      if (API_BASE === null) throw new Error('no-server');
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      typing.remove();
+      appendMsg('bot', json.reply);
+      history.push({ role: 'assistant', content: json.reply });
+    } catch {
+      typing.remove();
+      appendMsg('bot', 'Lo siento, no pude procesar tu pregunta ahora. Revisa el glosario o las preguntas frecuentes del portal.');
+    } finally {
+      input.disabled = false;
+      input.focus();
+    }
+  });
+
+  function appendMsg(role, text, isTyping = false) {
+    const div = document.createElement('div');
+    div.className = `chat-msg chat-msg--${role}`;
+    if (isTyping) div.classList.add('chat-msg--typing');
+    const p = document.createElement('p');
+    p.textContent = text;
+    div.appendChild(p);
+    msgList.appendChild(div);
+    msgList.scrollTop = msgList.scrollHeight;
+    return div;
+  }
+}
+
 // ── Init ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-consultar').addEventListener('click', consultar);
@@ -874,6 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
   initScrollAnimations();
   initThemeToggle();
+  initChatbot();
 
   // Hero stats: datos reales si hay servidor, animación si no
   cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));
