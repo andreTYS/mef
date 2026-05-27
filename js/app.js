@@ -816,21 +816,23 @@ async function cargarHeroStats() {
 // ── Intersección observer para animaciones ─────────
 function initScrollAnimations() {
   if (!('IntersectionObserver' in window)) return;
-  const items = document.querySelectorAll('.step-card, .glosario-card, .faq-item');
+  // faq-item excluido: usa <details> nativo; animarlo con opacity:0 puede
+  // dejarlo invisible si IntersectionObserver no dispara (ej. headless).
+  const items = document.querySelectorAll('.step-card, .glosario-card');
   const obs = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        entry.target.style.opacity  = '1';
+        entry.target.style.opacity   = '1';
         entry.target.style.transform = 'translateY(0)';
         obs.unobserve(entry.target);
       }
     });
-  }, { threshold: 0.1 });
+  }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' });
 
   items.forEach(el => {
-    el.style.opacity   = '0';
-    el.style.transform = 'translateY(20px)';
-    el.style.transition = 'opacity .4s ease, transform .4s ease';
+    el.style.opacity    = '0';
+    el.style.transform  = 'translateY(20px)';
+    el.style.transition = 'opacity .45s ease, transform .45s ease';
     obs.observe(el);
   });
 }

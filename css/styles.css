@@ -6,6 +6,7 @@
 
 /* ── Reset ────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 /* ══════════════════════════════════════════════════
    TOKENS — modo oscuro (default, estilo capibarismo)
@@ -493,7 +494,8 @@ img { display: block; max-width: 100%; }
   border-radius: var(--radius-lg);
   padding: 64px 24px; text-align: center;
 }
-.empty-icon { font-size: 56px; margin-bottom: 20px; }
+.empty-icon { width: 64px; height: 64px; margin: 0 auto 20px; color: var(--text-3); }
+.empty-icon svg { display: block; }
 .empty-state h3 { font-size: 18px; color: var(--text-2); margin-bottom: 8px; }
 .empty-state p  { font-size: 14px; color: var(--text-3); max-width: 400px; margin: 0 auto; }
 
@@ -558,9 +560,11 @@ img { display: block; max-width: 100%; }
 }
 .execution-bar-fill {
   height: 100%; width: 0%;
-  background: linear-gradient(90deg, var(--green), #4ade80);
+  background: linear-gradient(90deg, #16a34a, var(--green), #4ade80);
   border-radius: 100px;
-  transition: width 1s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  transition: width 1.2s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 0 12px rgba(34,197,94,.3);
 }
 .execution-bar-legend { display: flex; gap: 20px; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
@@ -727,6 +731,7 @@ img { display: block; max-width: 100%; }
 
 .faq-item { background: var(--bg-card); border: 1px solid var(--border-dim); border-radius: var(--radius); overflow: hidden; transition: box-shadow var(--transition), border-color var(--transition); }
 .faq-item[open] { box-shadow: var(--shadow); border-color: var(--steel); }
+.faq-item[open] .faq-question { background: var(--bg-raised); }
 
 .faq-question {
   display: flex; align-items: center; justify-content: space-between;
