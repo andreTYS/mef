@@ -2,6 +2,11 @@
 
 require('dotenv').config();
 
+// Ruta al Chromium instalado para scraping real del SIAF-MEF
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/pw-browsers';
+}
+
 const express   = require('express');
 const axios     = require('axios');
 const cheerio   = require('cheerio');
@@ -67,13 +72,22 @@ const DIMENSIONES = {
   categoria:   'ctl00$CPH1$BtnProgramaPpto',
 };
 
-// Headers comunes para simular navegador real
+// Headers completos de navegador real (necesarios para pasar bot-detection del MEF)
 function headersNavegador(anio) {
   return {
-    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'es-PE,es;q=0.9',
-    'Referer':         `https://apps5.mineco.gob.pe/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`,
-    'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+    'Accept':                    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language':           'es-PE,es;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding':           'gzip, deflate, br',
+    'Cache-Control':             'no-cache',
+    'Connection':                'keep-alive',
+    'Pragma':                    'no-cache',
+    'Referer':                   `https://apps5.mineco.gob.pe/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`,
+    'Sec-Fetch-Dest':            'document',
+    'Sec-Fetch-Mode':            'navigate',
+    'Sec-Fetch-Site':            'same-origin',
+    'Sec-Fetch-User':            '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent':                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   };
 }
 
@@ -87,11 +101,68 @@ function extraerTokensASP(html) {
   };
 }
 
+// ── Scraper Playwright — navegador real contra SIAF ─
+// Playwright maneja cookies, JS y fingerprinting correctamente,
+// evitando los bloqueos 403 que afectan a solicitudes HTTP simples.
+async function scraperPlaywright(anio, dim) {
+  let pw;
+  try { pw = require('/opt/node22/lib/node_modules/playwright'); }
+  catch (e) {
+    console.warn('[PW] Playwright no disponible:', e.message);
+    return null;
+  }
+
+  const browser = await pw.chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({
+      userAgent:    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      locale:       'es-PE',
+      timezoneId:   'America/Lima',
+      extraHTTPHeaders: { 'Accept-Language': 'es-PE,es;q=0.9,en;q=0.8' },
+    });
+    const page = await ctx.newPage();
+
+    const url = `https://apps5.mineco.gob.pe/transparencia/Navegador/Navegar_7.aspx?y=${anio}&ap=ActProy`;
+    console.log(`[PW] ↗ ${url}${dim ? '  dim:' + dim : ''}`);
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 });
+    await page.waitForSelector('table.Data', { timeout: 12000 }).catch(() => {});
+
+    // Drill-down: simular click en el botón de dimensión
+    if (dim && DIMENSIONES[dim]) {
+      const btn = await page.$(`input[name="${DIMENSIONES[dim]}"]`);
+      if (btn) {
+        console.log(`[PW] click drill-down: ${dim}`);
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {}),
+          btn.click(),
+        ]);
+        await page.waitForSelector('table.Data', { timeout: 12000 }).catch(() => {});
+      }
+    }
+
+    const html = await page.content();
+    const data  = parsearSIAF(html, anio);
+
+    if (data.total_registros > 0) {
+      console.log(`[PW] ✓ ${data.total_registros} registros`);
+    } else {
+      console.warn('[PW] ⚠ 0 registros — posible bloqueo o sesión inválida');
+    }
+    return data;
+  } catch (e) {
+    console.error('[PW] ✗', e.message.split('\n')[0]);
+    return null;
+  } finally {
+    await browser.close();
+  }
+}
+
 // ── GET /api/consulta — consulta principal ─────────
 // Parámetros:
 //   anio  : 2009–2025  (requerido)
 //   dim   : 'gobierno' | 'funcion' | 'departamento' | 'generica' | 'fuente' | 'categoria'
-//           Si se omite, devuelve solo el TOTAL general
+//           Si se omite, devuelve el TOTAL general
 app.get('/api/consulta', async (req, res) => {
   const { anio = 2024, dim = '' } = req.query;
 
@@ -102,46 +173,76 @@ app.get('/api/consulta', async (req, res) => {
     return res.json({ fuente: 'siaf-mef', cached: true, ...cached });
   }
 
+  // ═══════════════════════════════════════════════════
+  //  MÉTODO 1: Playwright — navegador Chromium real
+  //  Supera bot-detection (403) mejor que axios puro
+  // ═══════════════════════════════════════════════════
+  try {
+    const pwData = await scraperPlaywright(anio, dim || null);
+    if (pwData && pwData.total_registros > 0) {
+      if (dim) pwData.dimension = dim;
+      cache.set(cacheKey, pwData);
+      return res.json({ fuente: 'siaf-mef', cached: false, ...pwData });
+    }
+  } catch (pwErr) {
+    console.warn('[PW] falló, intentando axios:', pwErr.message.split('\n')[0]);
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  MÉTODO 2: axios con headers completos de navegador
+  //  (fallback si Playwright no está disponible)
+  // ═══════════════════════════════════════════════════
   const siafUrl = `/transparencia/Navegador/Navegar_7.aspx?y=${anio}&ap=ActProy`;
 
   try {
-    // ── Paso 1: GET inicial para obtener ViewState y cookies ──
-    console.log(`[MEF] GET ${siafUrl}`);
-    const getResp = await mefClient.get(siafUrl, { headers: headersNavegador(anio) });
+    // Paso 1: establecer sesión en default.aspx (obtiene cookies ASP.NET)
+    const defaultUrl = `/transparencia/Navegador/default.aspx?y=${anio}&ap=ActProy`;
+    console.log(`[axios] sesión en ${defaultUrl}`);
+    const sesionResp = await mefClient.get(defaultUrl, {
+      headers: { ...headersNavegador(anio), 'Sec-Fetch-Site': 'none' },
+    });
+    const sessionCookies = (sesionResp.headers['set-cookie'] || []).join('; ');
 
-    // Si no se pidió drill-down, devolver el TOTAL directamente
+    // Paso 2: GET Navegar_7 con cookies de sesión
+    console.log(`[axios] GET ${siafUrl}`);
+    const getResp = await mefClient.get(siafUrl, {
+      headers: { ...headersNavegador(anio), 'Cookie': sessionCookies },
+    });
+
     if (!dim || !DIMENSIONES[dim]) {
       const data = parsearSIAF(getResp.data, anio);
       cache.set(cacheKey, data);
       return res.json({ fuente: 'siaf-mef', cached: false, ...data });
     }
 
-    // ── Paso 2: extraer tokens ASP.NET para el POST ──
-    const tokens  = extraerTokensASP(getResp.data);
-    const cookies = (getResp.headers['set-cookie'] || []).join('; ');
-    const boton   = DIMENSIONES[dim];
+    // Paso 3: POST drill-down (simula click en botón de dimensión)
+    const tokens = extraerTokensASP(getResp.data);
+    const allCookies = [
+      sessionCookies,
+      ...(getResp.headers['set-cookie'] || []),
+    ].join('; ');
+    const boton = DIMENSIONES[dim];
 
-    console.log(`[MEF] POST drill-down: ${dim} → ${boton}`);
+    console.log(`[axios] POST drill-down: ${dim} → ${boton}`);
 
-    // ── Paso 3: POST simulando click en el botón de dimensión ──
     const formData = new URLSearchParams({
       '__EVENTTARGET':    '',
       '__EVENTARGUMENT':  '',
       '__VIEWSTATE':      tokens.viewstate,
       '__EVENTVALIDATION':tokens.eventvalidation,
-      [boton]:            boton.includes('BtnTipoGobierno') ? 'Nivel de Gobierno'
-                        : boton.includes('BtnFuncion')      ? 'Función'
-                        : boton.includes('BtnDepartamento') ? 'Departamento'
-                        : boton.includes('BtnGenerica')     ? 'Genérica'
-                        : boton.includes('BtnFuente')       ? 'Fuente'
-                        : 'Categoría Presupuestal',
+      [boton]: boton.includes('BtnTipoGobierno') ? 'Nivel de Gobierno'
+             : boton.includes('BtnFuncion')      ? 'Función'
+             : boton.includes('BtnDepartamento') ? 'Departamento'
+             : boton.includes('BtnGenerica')     ? 'Genérica'
+             : boton.includes('BtnFuente')       ? 'Fuente'
+             : 'Categoría Presupuestal',
     });
 
     const postResp = await mefClient.post(siafUrl, formData.toString(), {
       headers: {
         ...headersNavegador(anio),
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Cookie':        cookies,
+        'Cookie':       allCookies,
       },
     });
 
@@ -159,11 +260,11 @@ app.get('/api/consulta', async (req, res) => {
     res.json({ fuente: 'siaf-mef', cached: false, ...data });
 
   } catch (err) {
-    console.error('[MEF] Error:', err.message);
+    console.error('[axios] Error:', err.message);
     res.status(502).json({
       error:      'No se pudo conectar con el SIAF-MEF',
       detalle:    err.message,
-      sugerencia: 'Verifica tu conexión o intenta más tarde',
+      sugerencia: 'El servidor MEF puede estar bloqueando acceso externo. Intenta más tarde.',
     });
   }
 });

@@ -700,7 +700,7 @@ async function cargarDatosOficiales({ anio, nivel, region, sector } = {}) {
     const dim    = elegirDimension(nivel, region, sector);
     const params = new URLSearchParams({ anio, dim });
     const res    = await fetch(`${API_BASE}/api/consulta?${params}`, {
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(50000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -784,7 +784,7 @@ async function cargarHeroStats() {
   try {
     const anio = new Date().getFullYear() - 1;
     const res  = await fetch(`${API_BASE}/api/consulta?anio=${anio}`, {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(50000),
     });
     if (!res.ok) return;
     const json = await res.json();
