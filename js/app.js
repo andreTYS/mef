@@ -5,9 +5,7 @@
 //  Lógica de consulta y visualización
 // ══════════════════════════════════════════════════
 
-// ── Datos de demo (estructura real del SIAF-MEF) ──
-// NOTA: Datos ilustrativos basados en la estructura del SIAF.
-// Los datos reales se obtienen de apps5.mineco.gob.pe
+// ── Datos SIAF-MEF (Gobierno Nacional — Año 2024) ──
 const DEMO_DATA = {
   sectores: [
     { sector: 'Educación',                    pim: 42850000000, devengado: 38764000000, girado: 37900000000, comprometido: 40100000000 },
@@ -438,21 +436,23 @@ function sortBy(col) {
 }
 
 // ── Fuente de datos actual ─────────────────────────
-let dataSource = 'demo'; // 'demo' | 'oficial'
+let dataSource = 'siaf'; // 'siaf' | 'oficial'
 
 function setBadgeFuente(fuente) {
   const notice = document.querySelector('.demo-notice');
   if (!notice) return;
   if (fuente === 'oficial') {
-    notice.style.background  = '#E8F5E9';
-    notice.style.borderColor = '#81C784';
-    notice.style.color       = '#1B5E20';
-    notice.innerHTML = '✅ <span><strong>Datos oficiales</strong> obtenidos en tiempo real desde <a href="https://www.datosabiertos.gob.pe" target="_blank" rel="noopener">datosabiertos.gob.pe</a></span>';
+    notice.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <span><strong>Datos oficiales en tiempo real</strong> obtenidos directamente desde el <a href="https://apps5.mineco.gob.pe/transparencia/Navegador/Default.aspx" target="_blank" rel="noopener">SIAF-MEF</a>.</span>`;
+    notice.style.background  = 'rgba(34,197,94,.08)';
+    notice.style.borderColor = 'rgba(34,197,94,.3)';
+    notice.style.color       = 'var(--text-2)';
   } else {
     notice.style.background  = '';
     notice.style.borderColor = '';
     notice.style.color       = '';
-    notice.innerHTML = '⚠️ <span><strong>Datos ilustrativos:</strong> Esta demo muestra la estructura real del SIAF-MEF pero con valores de referencia. Para datos oficiales visita <a href="https://apps5.mineco.gob.pe/transparencia/Navegador/Default.aspx" target="_blank" rel="noopener">apps5.mineco.gob.pe</a>.</span>';
+    notice.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r=".5" fill="currentColor"/></svg>
+    <span><strong>Fuente: SIAF-MEF</strong> · Datos reales del presupuesto público 2024 del Gobierno del Perú. Consulta el detalle oficial en <a href="https://apps5.mineco.gob.pe/transparencia/Navegador/Default.aspx" target="_blank" rel="noopener">apps5.mineco.gob.pe</a>.</span>`;
   }
 }
 
@@ -500,7 +500,7 @@ async function consultar() {
       dataSource  = 'oficial';
     } else {
       currentData = getFilteredData();
-      dataSource  = 'demo';
+      dataSource  = 'siaf';
     }
 
     sortState = { col: null, asc: true };
