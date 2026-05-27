@@ -596,14 +596,25 @@ img { display: block; max-width: 100%; }
 /* Estado vacío */
 .empty-state {
   background: var(--bg-card);
-  border: 2px dashed var(--border-dim);
+  border: 1px solid var(--border-dim);
   border-radius: var(--radius-lg);
-  padding: 64px 24px; text-align: center;
+  padding: 48px 24px; text-align: center;
 }
-.empty-icon { width: 64px; height: 64px; margin: 0 auto 20px; color: var(--text-3); }
-.empty-icon svg { display: block; }
-.empty-state h3 { font-size: 18px; color: var(--text-2); margin-bottom: 8px; }
-.empty-state p  { font-size: 14px; color: var(--text-3); max-width: 400px; margin: 0 auto; }
+.empty-state-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty-state-dots { display: flex; gap: 8px; margin-bottom: 4px; }
+.empty-state-dots span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+.empty-state-dots span:nth-child(2) { animation-delay: .2s; }
+.empty-state-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes dot-pulse {
+  0%, 80%, 100% { opacity: .3; transform: scale(.85); }
+  40%            { opacity: 1;  transform: scale(1); }
+}
+.empty-state h3 { font-size: 17px; font-weight: 600; color: var(--text-2); }
+.empty-state p  { font-size: 14px; color: var(--text-3); max-width: 380px; }
 
 /* ══════════════════════════════════════════════════
    RESULTADOS
