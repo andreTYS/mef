@@ -25,12 +25,15 @@ const cache = new NodeCache({
 });
 
 // ── Configuración del cliente HTTP hacia MEF ───────
+const https = require('https');
 const mefClient = axios.create({
-  baseURL: 'https://apps5.mineco.gob.pe',
-  timeout: Number(process.env.MEF_TIMEOUT_MS) || 10000,
+  baseURL:    'https://apps5.mineco.gob.pe',
+  timeout:    Number(process.env.MEF_TIMEOUT_MS) || 15000,
+  // apps5.mineco.gob.pe usa certificado de CA no estándar — se omite validación TLS
+  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
   headers: {
-    'User-Agent': 'Mozilla/5.0 (compatible; MEF-Portal-Proxy/1.0)',
-    'Accept':     'text/html,application/xhtml+xml,application/json,*/*',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept':     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'es-PE,es;q=0.9',
   },
 });
@@ -115,10 +118,11 @@ async function scraperPlaywright(anio, dim) {
   const browser = await pw.chromium.launch({ headless: true });
   try {
     const ctx = await browser.newContext({
-      userAgent:    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      locale:       'es-PE',
-      timezoneId:   'America/Lima',
-      extraHTTPHeaders: { 'Accept-Language': 'es-PE,es;q=0.9,en;q=0.8' },
+      userAgent:         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      locale:            'es-PE',
+      timezoneId:        'America/Lima',
+      ignoreHTTPSErrors: true,   // apps5.mineco.gob.pe usa cert de CA no estándar
+      extraHTTPHeaders:  { 'Accept-Language': 'es-PE,es;q=0.9,en;q=0.8' },
     });
     const page = await ctx.newPage();
 
