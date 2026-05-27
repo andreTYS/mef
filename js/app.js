@@ -731,7 +731,7 @@ function renderChart(data) {
   if (!container) return;
 
   const maxPIM = Math.max(...data.map(d => d.pim), 1);
-  const HEIGHT = 180; // px altura máxima de barras
+  const HEIGHT = 240; // px altura máxima de barras
 
   const tooltip = document.getElementById('chart-tooltip');
 
@@ -746,10 +746,12 @@ function renderChart(data) {
       ? row.sector.slice(0, 13) + '…'
       : row.sector;
 
+    // Mostrar porcentaje solo si la barra PIM es suficientemente alta (≥24px)
+    const showPct = hPIM >= 24;
     const group = document.createElement('div');
     group.className = 'chart-bar-group';
     group.innerHTML = `
-      <span class="chart-bar-pct">${pct}%</span>
+      ${showPct ? `<span class="chart-bar-pct">${pct}%</span>` : ''}
       <div class="chart-bar-pair">
         <div class="chart-bar chart-bar--pim" style="height:${hPIM}px"
           data-tip="${row.sector} — PIM: ${fmt.currency(row.pim)}"></div>
