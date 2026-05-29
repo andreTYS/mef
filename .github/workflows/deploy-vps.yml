@@ -1,0 +1,22 @@
+name: Deploy → Hostinger VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            cd /var/www/mef
+            git pull origin main
+            npm ci --omit=dev --ignore-scripts
+            pm2 restart mef-portal || pm2 start ecosystem.config.js
+            pm2 save
