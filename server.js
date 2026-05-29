@@ -2,11 +2,6 @@
 
 require('dotenv').config();
 
-// Ruta al Chromium instalado para scraping real del SIAF-MEF
-if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/pw-browsers';
-}
-
 const express   = require('express');
 const axios     = require('axios');
 const cheerio   = require('cheerio');
@@ -109,7 +104,7 @@ function extraerTokensASP(html) {
 // evitando los bloqueos 403 que afectan a solicitudes HTTP simples.
 async function scraperPlaywright(anio, dim) {
   let pw;
-  try { pw = require('/opt/node22/lib/node_modules/playwright'); }
+  try { pw = require('playwright'); }
   catch (e) {
     console.warn('[PW] Playwright no disponible:', e.message);
     return null;
