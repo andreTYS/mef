@@ -8,6 +8,7 @@ const cheerio   = require('cheerio');
 const NodeCache = require('node-cache');
 const cors      = require('cors');
 const path      = require('path');
+const fs        = require('fs');
 
 const app   = express();
 const PORT  = process.env.PORT || 3000;
@@ -486,6 +487,50 @@ const REGIONES_MEF = [
   { ubigeo: '250000', nombre: 'Ucayali' },
   { ubigeo: '260000', nombre: 'Lima Región' },
 ];
+
+// ── POST /api/feed — recibir datos desde PC peruana ──
+// El feeder.js que corre en la PC de Perú scraping SIAF y envía aquí.
+// Protegido por FEED_SECRET en .env
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+
+// Cargar datos persistidos al iniciar el servidor
+(function cargarDatosPersistidos() {
+  try {
+    const archivos = fs.readdirSync(DATA_DIR).filter(f => f.startsWith('siaf_') && f.endsWith('.json'));
+    archivos.forEach(f => {
+      const data = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8'));
+      const key  = `consulta_${data.anio}_${data.dim || ''}`;
+      cache.set(key, data);
+      console.log(`[feed] Cargado desde disco: ${key} (${data.total_registros} reg.)`);
+    });
+  } catch (e) {
+    console.warn('[feed] Sin datos persistidos:', e.message);
+  }
+})();
+
+app.post('/api/feed', (req, res) => {
+  const secret = req.headers['x-feed-secret'] || req.body?.secret;
+  if (!process.env.FEED_SECRET || secret !== process.env.FEED_SECRET) {
+    return res.status(403).json({ error: 'Clave incorrecta — configura FEED_SECRET en .env' });
+  }
+
+  const data = req.body?.data;
+  if (!data || !data.anio) {
+    return res.status(400).json({ error: 'Falta data.anio' });
+  }
+
+  const dim = data.dim || '';
+  const key = `consulta_${data.anio}_${dim}`;
+  cache.set(key, data);
+
+  // Persistir en disco para sobrevivir reinicios
+  const archivo = path.join(DATA_DIR, `siaf_${data.anio}_${dim || 'total'}.json`);
+  fs.writeFileSync(archivo, JSON.stringify(data));
+
+  console.log(`[feed] ✓ ${key} — ${data.total_registros} registros guardados`);
+  res.json({ ok: true, key, registros: data.total_registros });
+});
 
 // ── Iniciar servidor ───────────────────────────────
 app.listen(PORT, () => {
