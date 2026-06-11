@@ -5,13 +5,15 @@ require('dotenv').config();
 const express   = require('express');
 const axios     = require('axios');
 const cheerio   = require('cheerio');
-const NodeCache = require('node-cache');
-const cors      = require('cors');
-const path      = require('path');
-const fs        = require('fs');
+const NodeCache   = require('node-cache');
+const cors        = require('cors');
+const rateLimit   = require('express-rate-limit');
+const path        = require('path');
+const fs          = require('fs');
 
-const app   = express();
-const PORT  = process.env.PORT || 3000;
+const app      = express();
+const PORT     = process.env.PORT || 3000;
+const DATA_DIR = path.join(__dirname, 'data');
 
 // ── Caché en memoria (evita sobrecargar el servidor MEF) ──
 // TTL: 1 hora por defecto (el SIAF actualiza cada noche)
@@ -34,6 +36,18 @@ const mefClient = axios.create({
   },
 });
 
+// ── Rate limiters ─────────────────────────────────
+const limiterConsulta = rateLimit({
+  windowMs: 60_000, max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Demasiadas consultas. Espera un minuto.' },
+});
+const limiterChat = rateLimit({
+  windowMs: 60_000, max: 10,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Demasiadas preguntas al asistente. Espera un minuto.' },
+});
+
 // ── Middlewares ────────────────────────────────────
 app.use(cors());
 app.use(express.json());
@@ -53,11 +67,19 @@ app.use((req, res, next) => {
 
 // ── GET /api/status — healthcheck ─────────────────
 app.get('/api/status', (req, res) => {
+  const dataFiles = fs.existsSync(DATA_DIR)
+    ? fs.readdirSync(DATA_DIR).filter(f => f.startsWith('siaf_') && f.endsWith('.json')).map(f => {
+        const stat = fs.statSync(path.join(DATA_DIR, f));
+        return { archivo: f, modificado: stat.mtime.toISOString() };
+      })
+    : [];
   res.json({
-    ok:      true,
-    version: '1.0.0',
-    cache:   cache.getStats(),
-    time:    new Date().toISOString(),
+    ok:       true,
+    version:  '1.1.0',
+    uptime_s: Math.floor(process.uptime()),
+    cache:    cache.getStats(),
+    datos:    dataFiles,
+    time:     new Date().toISOString(),
   });
 });
 
@@ -163,7 +185,7 @@ async function scraperPlaywright(anio, dim) {
 //   anio  : 2009–2025  (requerido)
 //   dim   : 'gobierno' | 'funcion' | 'departamento' | 'generica' | 'fuente' | 'categoria'
 //           Si se omite, devuelve el TOTAL general
-app.get('/api/consulta', async (req, res) => {
+app.get('/api/consulta', limiterConsulta, async (req, res) => {
   const { anio = 2024, dim = '' } = req.query;
 
   const cacheKey = `consulta_${anio}_${dim}`;
@@ -310,7 +332,7 @@ function chatFallback(msg) {
   return 'Puedo ayudarte a entender el presupuesto público del Perú. Pregúntame sobre términos como PIM, PIA, devengado, girado, SIAF, o cómo interpretar los indicadores de ejecución presupuestal.';
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', limiterChat, async (req, res) => {
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages) || !messages.length) {
     return res.status(400).json({ error: 'messages requerido' });
@@ -491,7 +513,6 @@ const REGIONES_MEF = [
 // ── POST /api/feed — recibir datos desde PC peruana ──
 // El feeder.js que corre en la PC de Perú scraping SIAF y envía aquí.
 // Protegido por FEED_SECRET en .env
-const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 
 // Cargar datos persistidos al iniciar el servidor

@@ -258,7 +258,10 @@ function miniBar(pct) {
 })();
 
 // ── Estado de la aplicación ────────────────────────
-let currentData = [];
+let currentData  = [];
+let compareData  = null;   // datos del año anterior (modo comparación)
+let compareMode  = false;
+let compareYear  = null;
 let sortState = { col: null, asc: true };
 
 // ── Mostrar/ocultar filtro de región ────────────────
@@ -374,24 +377,132 @@ function actualizarKPIs(pim, devengado, girado, comprometido, pct) {
 
 // ── Renderizar tabla ───────────────────────────────
 function renderTable(data) {
-  const tbody = document.getElementById('table-body');
+  const tbody  = document.getElementById('table-body');
+  const thead  = document.querySelector('.data-table thead tr');
   tbody.innerHTML = '';
 
-  data.forEach(row => {
-    const pct = fmt.pctNum(row.devengado, row.pim);
-    const tr  = document.createElement('tr');
+  // Sincronizar cabecera con modo comparación
+  const extraTh = thead.querySelector('.th-compare');
+  if (compareMode && compareData) {
+    if (!extraTh) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.className = 'th-compare';
+      th.innerHTML = `Dev. ${compareYear} <span class="th-compare-note">(año ant.)</span>`;
+      thead.insertBefore(th, thead.querySelector('th[data-col="avance"]'));
+    }
+  } else if (extraTh) {
+    extraTh.remove();
+  }
+
+  data.forEach((row, i) => {
+    const pct   = fmt.pctNum(row.devengado, row.pim);
+    const tr    = document.createElement('tr');
+    tr.className = 'data-row';
+    tr.setAttribute('tabindex', '0');
+    tr.setAttribute('aria-expanded', 'false');
+    tr.title = 'Click para ver detalle completo';
+
+    // Columna comparación
+    let cmpCell = '';
+    if (compareMode && compareData) {
+      const cRow = compareData.find(c =>
+        c.sector.toLowerCase().slice(0, 8) === row.sector.toLowerCase().slice(0, 8)
+      );
+      if (cRow) {
+        const cPct  = fmt.pctNum(cRow.devengado, cRow.pim);
+        const delta = pct - cPct;
+        const sign  = delta >= 0 ? '+' : '';
+        const cls   = delta >= 0 ? 'cmp-up' : 'cmp-down';
+        cmpCell = `<td class="num"><span class="cmp-val">${fmt.currency(cRow.devengado)}</span><span class="cmp-delta ${cls}">${sign}${delta.toFixed(1)}pp</span></td>`;
+      } else {
+        cmpCell = `<td class="num cmp-na">—</td>`;
+      }
+    }
+
     tr.innerHTML = `
-      <td><strong>${row.sector}</strong></td>
+      <td><span class="row-expand-icon" aria-hidden="true">▶</span><strong>${row.sector}</strong></td>
       <td class="num">${fmt.currency(row.pim)}</td>
       <td class="num">${fmt.currency(row.devengado)}</td>
+      ${cmpCell}
       <td>
         ${miniBar(pct)}
-        <span style="font-size:12px;color:var(--gray-600);margin-left:6px">${pct}%</span>
+        <span style="font-size:12px;color:var(--text-3);margin-left:6px">${pct}%</span>
       </td>
       <td>${statusChip(pct)}</td>
     `;
+
+    tr.addEventListener('click', () => toggleRowDetail(tr, row));
+    tr.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRowDetail(tr, row); }
+    });
+
     tbody.appendChild(tr);
   });
+}
+
+// ── Drill-down: expandir fila con detalle completo ──
+function toggleRowDetail(tr, row) {
+  const isExpanded = tr.getAttribute('aria-expanded') === 'true';
+
+  // Colapsar cualquier otra fila abierta
+  document.querySelectorAll('.data-row[aria-expanded="true"]').forEach(r => {
+    r.setAttribute('aria-expanded', 'false');
+    r.querySelector('.row-expand-icon').textContent = '▶';
+    const det = r.nextElementSibling;
+    if (det?.classList.contains('row-detail')) det.remove();
+  });
+
+  if (isExpanded) return;
+
+  tr.setAttribute('aria-expanded', 'true');
+  tr.querySelector('.row-expand-icon').textContent = '▼';
+
+  const pct    = fmt.pctNum(row.devengado, row.pim);
+  const detail = document.createElement('tr');
+  detail.className = 'row-detail';
+  const colSpan = (compareMode && compareData) ? 6 : 5;
+  detail.innerHTML = `
+    <td colspan="${colSpan}">
+      <div class="row-detail-inner">
+        <div class="row-detail-grid">
+          <div class="row-detail-item">
+            <span class="detail-label">PIA</span>
+            <strong class="detail-value">${fmt.currency(row.pia || 0)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">PIM</span>
+            <strong class="detail-value">${fmt.currency(row.pim)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Certificación</span>
+            <strong class="detail-value">${fmt.currency(row.certificacion || 0)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Comprometido Anual</span>
+            <strong class="detail-value">${fmt.currency(row.comprometido || 0)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Comprometido Mensual</span>
+            <strong class="detail-value">${fmt.currency(row.compromiso_mens || 0)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Devengado</span>
+            <strong class="detail-value">${fmt.currency(row.devengado)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Girado</span>
+            <strong class="detail-value">${fmt.currency(row.girado || 0)}</strong>
+          </div>
+          <div class="row-detail-item">
+            <span class="detail-label">Avance</span>
+            <strong class="detail-value" style="color:${pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--gold)' : 'var(--red)'}">${pct}%</strong>
+          </div>
+        </div>
+      </div>
+    </td>
+  `;
+  tr.after(detail);
 }
 
 // ── Ordenar tabla ──────────────────────────────────
@@ -433,6 +544,44 @@ function sortBy(col) {
   }
 
   renderTable(currentData);
+}
+
+// ── Comparación interanual ─────────────────────────
+function initCompare() {
+  const btn = document.getElementById('btn-compare');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    compareMode = !compareMode;
+    btn.setAttribute('aria-pressed', String(compareMode));
+    btn.classList.toggle('btn-compare--active', compareMode);
+
+    if (compareMode && currentData.length) {
+      const year = Number(document.getElementById('select-year').value);
+      compareYear = year - 1;
+      btn.textContent = '';
+      btn.disabled = true;
+      btn.innerHTML = `<span class="btn-compare-spinner"></span> Cargando ${compareYear}…`;
+
+      try {
+        const nivel  = document.getElementById('select-nivel').value;
+        const region = document.getElementById('select-region').value;
+        const sector = document.getElementById('select-sector').value;
+        const res = await cargarDatosOficiales({ anio: compareYear, nivel, region, sector });
+        compareData = (res.fuente === 'oficial' && res.datos?.length) ? res.datos : null;
+      } catch { compareData = null; }
+
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        ${compareMode ? `Ocultar ${compareYear}` : 'Comparar año anterior'}`;
+    } else {
+      compareData = null;
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Comparar año anterior`;
+    }
+
+    renderTable(currentData);
+    renderChart(currentData);
+  });
 }
 
 // ── Fuente de datos actual ─────────────────────────
@@ -503,15 +652,34 @@ async function consultar() {
       dataSource  = 'siaf';
     }
 
-    sortState = { col: null, asc: true };
+    sortState    = { col: null, asc: true };
+    // Resetear comparación al hacer nueva consulta
+    compareMode  = false;
+    compareData  = null;
+    const cmpBtn = document.getElementById('btn-compare');
+    if (cmpBtn) {
+      cmpBtn.setAttribute('aria-pressed', 'false');
+      cmpBtn.classList.remove('btn-compare--active');
+      cmpBtn.disabled = false;
+      cmpBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Comparar año anterior`;
+    }
 
     // Subtítulo
     const nivelLabel  = nivel.options[nivel.selectedIndex].text.replace(/^[^\wÀ-ɏ]+/, '');
     const regionLabel = regionEl.value ? ` · ${regionEl.options[regionEl.selectedIndex].text}` : '';
     const sectorLabel = sector.value ? sector.options[sector.selectedIndex].text : 'Todos los sectores';
-    let subtitulo = `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
-    if (resultado?.ultimaActualizacion) subtitulo += ` · Act: ${resultado.ultimaActualizacion}`;
-    document.getElementById('results-subtitle').textContent = subtitulo;
+    document.getElementById('results-subtitle').textContent =
+      `Año ${year} · ${nivelLabel || 'Todos los niveles'}${regionLabel} · ${sectorLabel}`;
+
+    // Badge de última actualización
+    const badge     = document.getElementById('update-badge');
+    const badgeTxt  = document.getElementById('update-badge-text');
+    if (badge && badgeTxt && resultado?.ultimaActualizacion) {
+      badgeTxt.textContent = `Datos actualizados al: ${resultado.ultimaActualizacion}`;
+      badge.hidden = false;
+    } else if (badge) {
+      badge.hidden = true;
+    }
 
     setBadgeFuente(dataSource);
 
@@ -730,8 +898,26 @@ function renderChart(data) {
   const container = document.getElementById('bar-chart');
   if (!container) return;
 
-  const maxPIM = Math.max(...data.map(d => d.pim), 1);
-  const HEIGHT = 240; // px altura máxima de barras
+  // Actualizar leyenda según modo comparación
+  const legendCmp = document.querySelector('.chart-legend-item--cmp');
+  if (compareMode && compareData) {
+    if (!legendCmp) {
+      const leg = document.querySelector('.chart-legend');
+      if (leg) {
+        const span = document.createElement('span');
+        span.className = 'chart-legend-item chart-legend-item--cmp';
+        span.textContent = `Dev. ${compareYear}`;
+        leg.appendChild(span);
+      }
+    }
+  } else if (legendCmp) {
+    legendCmp.remove();
+  }
+
+  const allPIM = data.map(d => d.pim);
+  if (compareMode && compareData) compareData.forEach(d => allPIM.push(d.pim));
+  const maxPIM = Math.max(...allPIM, 1);
+  const HEIGHT = 240;
 
   const tooltip = document.getElementById('chart-tooltip');
 
@@ -746,7 +932,19 @@ function renderChart(data) {
       ? row.sector.slice(0, 13) + '…'
       : row.sector;
 
-    // Mostrar porcentaje solo si la barra PIM es suficientemente alta (≥24px)
+    let cmpBar = '';
+    if (compareMode && compareData) {
+      const cRow = compareData.find(c =>
+        c.sector.toLowerCase().slice(0, 8) === row.sector.toLowerCase().slice(0, 8)
+      );
+      if (cRow) {
+        const hCmp = Math.round((cRow.devengado / maxPIM) * HEIGHT);
+        const cPct = fmt.pctNum(cRow.devengado, cRow.pim);
+        cmpBar = `<div class="chart-bar chart-bar--cmp" style="height:${hCmp}px"
+          data-tip="${row.sector} — Dev. ${compareYear}: ${fmt.currency(cRow.devengado)} (${cPct}%)"></div>`;
+      }
+    }
+
     const showPct = hPIM >= 24;
     const group = document.createElement('div');
     group.className = 'chart-bar-group';
@@ -757,6 +955,7 @@ function renderChart(data) {
           data-tip="${row.sector} — PIM: ${fmt.currency(row.pim)}"></div>
         <div class="chart-bar chart-bar--dev" style="height:${hDev}px"
           data-tip="${row.sector} — Devengado: ${fmt.currency(row.devengado)} (${pct}%)"></div>
+        ${cmpBar}
       </div>
       <span class="chart-bar-label">${label}</span>
     `;
@@ -766,7 +965,6 @@ function renderChart(data) {
   container.innerHTML = '';
   container.appendChild(wrap);
 
-  // Tooltip hover
   container.querySelectorAll('.chart-bar').forEach(bar => {
     bar.addEventListener('mousemove', e => {
       tooltip.textContent = bar.dataset.tip;
@@ -947,6 +1145,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollAnimations();
   initThemeToggle();
   initChatbot();
+  initCompare();
 
   // Hero stats: datos reales si hay servidor, animación si no
   cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));

@@ -332,8 +332,20 @@
 
         <!-- Resumen ejecutivo -->
         <div class="results-summary">
-          <h2 class="results-title" id="results-heading">Resultados de la consulta</h2>
-          <p class="results-subtitle" id="results-subtitle"></p>
+          <div class="results-summary-top">
+            <div>
+              <h2 class="results-title" id="results-heading">Resultados de la consulta</h2>
+              <p class="results-subtitle" id="results-subtitle"></p>
+            </div>
+            <button class="btn-compare" id="btn-compare" type="button" aria-pressed="false">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+              Comparar año anterior
+            </button>
+          </div>
+          <div class="update-badge" id="update-badge" hidden>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+            <span id="update-badge-text">—</span>
+          </div>
         </div>
 
         <!-- KPI Cards -->
