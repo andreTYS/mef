@@ -330,6 +330,37 @@ function getFilteredData() {
   return data;
 }
 
+// ── Skeleton loaders ──────────────────────────────
+function showSkeleton() {
+  // Mostrar panel de resultados vacío con esqueletos
+  document.getElementById('empty-state').hidden  = true;
+  document.getElementById('results-panel').hidden = false;
+
+  // KPIs skeleton
+  document.querySelectorAll('.kpi-value').forEach(el => el.classList.add('skel-pulse'));
+  document.querySelectorAll('.kpi-note').forEach(el => el.classList.add('skel-pulse'));
+
+  // Tabla skeleton
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const tr = document.createElement('tr');
+    tr.className = 'skeleton-row';
+    tr.innerHTML = `
+      <td><span class="skel skel--name"></span></td>
+      <td><span class="skel skel--num"></span></td>
+      <td><span class="skel skel--num"></span></td>
+      <td><span class="skel skel--bar"></span></td>
+      <td><span class="skel skel--chip"></span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function hideSkeleton() {
+  document.querySelectorAll('.skel-pulse').forEach(el => el.classList.remove('skel-pulse'));
+}
+
 // ── Renderizar KPIs desde resumen oficial SIAF ─────
 function renderKPIsFromResumen(resumen) {
   actualizarKPIs(
@@ -622,6 +653,13 @@ async function consultar() {
   btn.disabled = true;
   btn.textContent = '';
 
+  // Ocultar banner de error previo
+  const errBanner = document.getElementById('api-error-banner');
+  if (errBanner) errBanner.hidden = true;
+
+  // Mostrar skeleton inmediatamente
+  showSkeleton();
+
   const btnRestore = () => {
     btn.classList.remove('loading');
     btn.disabled = false;
@@ -683,6 +721,14 @@ async function consultar() {
 
     setBadgeFuente(dataSource);
 
+    // Mostrar banner si los datos son fallback (no oficiales)
+    if (dataSource !== 'oficial' && errBanner) {
+      document.getElementById('api-error-text').textContent =
+        'No se pudo conectar con el SIAF-MEF en tiempo real. Se muestran los últimos datos disponibles.';
+      errBanner.hidden = false;
+    }
+
+    hideSkeleton();
     if (dataSource === 'oficial' && resultado?.resumen) {
       renderKPIsFromResumen(resultado.resumen);
     } else {
@@ -691,14 +737,25 @@ async function consultar() {
     renderTable(currentData);
     renderChart(currentData);
 
-    document.getElementById('empty-state').hidden  = true;
-    document.getElementById('results-panel').hidden = false;
+    // Resetear tendencia al hacer nueva consulta
+    const trendSec = document.getElementById('trend-section');
+    if (trendSec) trendSec.hidden = true;
+    const btnTrend = document.getElementById('btn-trend');
+    if (btnTrend) { btnTrend.classList.remove('btn-trend--active'); btnTrend.textContent = ''; btnTrend.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Ver tendencia`; }
+
     document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   } catch (err) {
     console.error('[consultar]', err);
+    hideSkeleton();
+    document.getElementById('empty-state').hidden  = false;
+    document.getElementById('results-panel').hidden = true;
+    if (errBanner) {
+      document.getElementById('api-error-text').textContent =
+        `Error inesperado: ${err.message}. Intenta de nuevo.`;
+      errBanner.hidden = false;
+    }
   } finally {
-    // El botón SIEMPRE se restaura, pase lo que pase
     btnRestore();
   }
 }
@@ -1131,6 +1188,134 @@ function initChatbot() {
   }
 }
 
+// ── Búsqueda rápida en tabla ───────────────────────
+function initTableSearch() {
+  const input = document.getElementById('table-search');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!currentData.length) return;
+    const filtered = q ? currentData.filter(r => r.sector.toLowerCase().includes(q)) : currentData;
+    renderTable(filtered);
+  });
+}
+
+// ── Tendencia histórica ────────────────────────────
+async function renderTrendChart() {
+  const container = document.getElementById('trend-chart');
+  if (!container) return;
+  container.innerHTML = '<p class="trend-loading">Cargando datos históricos…</p>';
+
+  const currentYear = new Date().getFullYear() - 1;
+  const years = [];
+  for (let y = 2018; y <= currentYear; y++) years.push(y);
+
+  const nivel  = document.getElementById('select-nivel').value;
+  const region = document.getElementById('select-region').value;
+  const sector = document.getElementById('select-sector').value;
+
+  const results = await Promise.allSettled(
+    years.map(y => cargarDatosOficiales({ anio: y, nivel, region, sector }))
+  );
+
+  const pts = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value.fuente === 'oficial') {
+      const d = r.value;
+      const pct = d.resumen?.avance_pct != null
+        ? d.resumen.avance_pct
+        : d.datos?.length
+          ? fmt.pctNum(d.datos.reduce((a,b) => a + b.devengado, 0), d.datos.reduce((a,b) => a + b.pim, 0))
+          : null;
+      if (pct !== null) pts.push({ year: years[i], pct });
+    }
+  });
+
+  const trendLabel = document.getElementById('trend-years-label');
+  const trendBadge = document.getElementById('trend-delta-badge');
+
+  if (pts.length < 2) {
+    container.innerHTML = '<p class="trend-empty">No hay suficientes datos históricos disponibles (se necesitan datos del SIAF en tiempo real).</p>';
+    if (trendLabel) trendLabel.textContent = '';
+    if (trendBadge) trendBadge.textContent = '';
+    return;
+  }
+
+  if (trendLabel) trendLabel.textContent = `${pts[0].year}–${pts[pts.length - 1].year}`;
+  const delta = pts[pts.length - 1].pct - pts[0].pct;
+  if (trendBadge) {
+    trendBadge.textContent = (delta >= 0 ? '▲ +' : '▼ ') + delta.toFixed(1) + 'pp vs ' + pts[0].year;
+    trendBadge.className = 'trend-delta-badge ' + (delta >= 0 ? 'trend-delta--up' : 'trend-delta--down');
+  }
+
+  const W = 600, H = 190;
+  const PAD = { top: 22, right: 16, bottom: 32, left: 42 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+  const xS = i => PAD.left + (i / (pts.length - 1)) * cW;
+  const yS = v => PAD.top + (1 - v / 100) * cH;
+
+  const gridLines = [0, 25, 50, 75, 100].map(v =>
+    `<line x1="${PAD.left}" y1="${yS(v)}" x2="${W - PAD.right}" y2="${yS(v)}" stroke="rgba(255,255,255,.07)" stroke-width="1"/>
+     <text x="${PAD.left - 5}" y="${yS(v) + 4}" text-anchor="end" font-size="9.5" fill="rgba(255,255,255,.35)">${v}%</text>`
+  ).join('');
+
+  const linePts = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(i)},${yS(p.pct)}`).join(' ');
+  const areaPts = `${linePts} L${xS(pts.length-1)},${H - PAD.bottom} L${xS(0)},${H - PAD.bottom} Z`;
+
+  const dots = pts.map((p, i) => {
+    const col = p.pct >= 80 ? 'var(--green)' : p.pct >= 60 ? 'var(--gold)' : 'var(--red)';
+    return `<circle cx="${xS(i)}" cy="${yS(p.pct)}" r="4.5" fill="${col}" stroke="var(--bg-card)" stroke-width="2"><title>${p.year}: ${p.pct}%</title></circle>
+            <text x="${xS(i)}" y="${yS(p.pct) - 9}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${col}">${p.pct}%</text>`;
+  }).join('');
+
+  const xLabels = pts.map((p, i) =>
+    `<text x="${xS(i)}" y="${H - PAD.bottom + 16}" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,.45)">${p.year}</text>`
+  ).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="trend-svg">
+      <defs>
+        <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--red)" stop-opacity=".18"/>
+          <stop offset="100%" stop-color="var(--red)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <line x1="${PAD.left}" y1="${yS(80)}" x2="${W-PAD.right}" y2="${yS(80)}" stroke="rgba(34,197,94,.35)" stroke-dasharray="5 3" stroke-width="1"/>
+      <line x1="${PAD.left}" y1="${yS(60)}" x2="${W-PAD.right}" y2="${yS(60)}" stroke="rgba(245,158,11,.35)" stroke-dasharray="5 3" stroke-width="1"/>
+      <path d="${areaPts}" fill="url(#trendGrad)"/>
+      <path d="${linePts}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}${xLabels}
+    </svg>`;
+}
+
+function initTrend() {
+  const btn = document.getElementById('btn-trend');
+  const sec = document.getElementById('trend-section');
+  if (!btn || !sec) return;
+  btn.addEventListener('click', async () => {
+    const open = !sec.hidden;
+    if (open) {
+      sec.hidden = true;
+      btn.classList.remove('btn-trend--active');
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Ver tendencia`;
+    } else {
+      sec.hidden = false;
+      btn.classList.add('btn-trend--active');
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Ocultar tendencia`;
+      await renderTrendChart();
+    }
+  });
+}
+
+// ── Imprimir informe ───────────────────────────────
+function initPrint() {
+  const btn = document.getElementById('btn-print');
+  if (!btn) return;
+  btn.addEventListener('click', () => window.print());
+}
+
 // ── Init ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-consultar').addEventListener('click', consultar);
@@ -1138,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-export')?.addEventListener('click', exportCSV);
   document.getElementById('select-nivel').addEventListener('change', toggleRegionFilter);
 
-  toggleRegionFilter(); // ocultar región al inicio (Nacional preseleccionado)
+  toggleRegionFilter();
   attachSortListeners();
   initMobileMenu();
   initKeyboardShortcuts();
@@ -1146,8 +1331,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initChatbot();
   initCompare();
+  initTableSearch();
+  initTrend();
+  initPrint();
 
-  // Hero stats: datos reales si hay servidor, animación si no
   cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));
   setTimeout(animateHeroNumbers, 600);
 });
+
+// ── Service Worker (PWA) ──────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}

@@ -564,6 +564,19 @@ app.listen(PORT, () => {
   console.log(`  ║  Status:  http://localhost:${PORT}/api/status ║`);
   console.log('  ╚═══════════════════════════════════════╝');
   console.log('');
-  console.log('  Presiona Ctrl+C para detener el servidor');
-  console.log('');
+
+  // Cache warming: pre-carga el año corriente en background
+  // para que el primer usuario no espere 15–30s de Playwright
+  const warmYear = new Date().getFullYear() - 1;
+  if (!cache.get(`consulta_${warmYear}_`)) {
+    console.log(`[cache] Calentando caché para ${warmYear}…`);
+    scraperPlaywright(warmYear, null)
+      .then(data => {
+        if (data?.total_registros > 0) {
+          cache.set(`consulta_${warmYear}_`, data);
+          console.log(`[cache] ✓ Caché lista — ${warmYear}: ${data.total_registros} registros`);
+        }
+      })
+      .catch(e => console.warn('[cache] Warming falló (no crítico):', e.message.split('\n')[0]));
+  }
 });

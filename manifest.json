@@ -1,0 +1,33 @@
+{
+  "name": "MEF Perú — Consulta Amigable",
+  "short_name": "MEF Transparencia",
+  "description": "Portal de Transparencia Económica del Ministerio de Economía y Finanzas del Perú",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0F1729",
+  "theme_color": "#C8102E",
+  "lang": "es-PE",
+  "categories": ["government", "finance"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Consultar presupuesto",
+      "url": "/#consulta",
+      "description": "Ir directamente al formulario de consulta"
+    }
+  ]
+}

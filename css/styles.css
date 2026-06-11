@@ -1313,8 +1313,227 @@ img { display: block; max-width: 100%; }
 }
 
 /* ══════════════════════════════════════════════════
-   MEJORAS: COMPARACIÓN INTERANUAL + DRILL-DOWN + TIMESTAMP
+   MEJORAS: SKELETON · ERROR BANNER · BÚSQUEDA · TENDENCIA
+            PRINT · COMPARACIÓN · DRILL-DOWN · TIMESTAMP
 ══════════════════════════════════════════════════ */
+
+/* ── Skeleton loaders ────────────────────────────── */
+@keyframes skelPulse {
+  0%, 100% { opacity: .4; }
+  50%       { opacity: .9; }
+}
+.skeleton-row td { padding: 10px 14px; }
+.skel {
+  display: inline-block;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  animation: skelPulse 1.4s ease-in-out infinite;
+}
+.skel--name  { width: 120px; height: 14px; }
+.skel--num   { width: 80px;  height: 14px; }
+.skel--bar   { width: 100%;  height: 12px; }
+.skel--chip  { width: 72px;  height: 22px; border-radius: 20px; }
+.skel-pulse  { animation: skelPulse 1.4s ease-in-out infinite; opacity: .4; }
+
+/* ── Banner de error API ─────────────────────────── */
+.api-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: rgba(200,16,46,.08);
+  border: 1px solid rgba(200,16,46,.25);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.api-error-banner svg { color: var(--red); flex-shrink: 0; margin-top: 1px; }
+.api-error-banner span { flex: 1; }
+.api-error-close {
+  background: none; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 14px; padding: 0 4px; flex-shrink: 0;
+  line-height: 1;
+}
+.api-error-close:hover { color: var(--text); }
+[data-theme="light"] .api-error-banner {
+  background: rgba(200,16,46,.06);
+  border-color: rgba(200,16,46,.2);
+  color: #2c3e5c;
+}
+
+/* ── Búsqueda en tabla ───────────────────────────── */
+.table-header { flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.table-header-left {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.table-header-right {
+  display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+}
+.table-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.table-search-icon {
+  position: absolute; left: 10px; color: var(--text-3); pointer-events: none;
+}
+.table-search {
+  padding: 7px 10px 7px 30px;
+  border: 1.5px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  width: 200px;
+  transition: border-color var(--transition), width var(--transition);
+}
+.table-search:focus { border-color: var(--red); width: 240px; }
+.table-search::placeholder { color: var(--text-3); }
+[data-theme="light"] .table-search {
+  background: #fff; border-color: #c4d3e8; color: #0F1729;
+}
+
+/* ── Botón imprimir ──────────────────────────────── */
+.btn-print {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px;
+  background: transparent;
+  border: 1.5px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 13px; font-weight: 500; font-family: var(--font);
+  cursor: pointer; white-space: nowrap;
+  transition: all var(--transition);
+}
+.btn-print:hover {
+  border-color: var(--steel-light);
+  background: var(--bg-raised);
+  color: var(--text);
+}
+[data-theme="light"] .btn-print { color: #2c3e5c; border-color: #a4b9d9; }
+[data-theme="light"] .btn-print:hover { background: #eef4ff; }
+
+/* ── Tendencia histórica ─────────────────────────── */
+.trend-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-top: 20px;
+  animation: fadeIn .25s ease;
+}
+.trend-chart-container { width: 100%; overflow-x: auto; }
+.trend-svg { width: 100%; height: auto; display: block; }
+.trend-loading, .trend-empty {
+  color: var(--text-3); font-size: 13px; text-align: center;
+  padding: 32px 0;
+}
+.trend-delta-badge {
+  font-size: 12px; font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.trend-delta--up   { background: var(--green-dim); color: var(--green); }
+.trend-delta--down { background: rgba(200,16,46,.1); color: var(--red); }
+.trend-legend {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border-dim);
+}
+.trend-ref { font-size: 11px; color: var(--text-3); }
+.trend-ref--good { color: rgba(34,197,94,.7); }
+.trend-ref--mid  { color: rgba(245,158,11,.7); }
+[data-theme="light"] .trend-section {
+  background: #fff; border-color: #c4d3e8;
+}
+[data-theme="light"] .trend-loading,
+[data-theme="light"] .trend-empty { color: #5a7499; }
+
+/* ── Botón tendencia ─────────────────────────────── */
+.chart-header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn-trend {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1.5px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 12px; font-weight: 500; font-family: var(--font);
+  cursor: pointer; white-space: nowrap;
+  transition: all var(--transition);
+}
+.btn-trend:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-glow);
+}
+.btn-trend--active {
+  border-color: var(--red);
+  background: rgba(200,16,46,.08);
+  color: var(--red);
+}
+[data-theme="light"] .btn-trend { color: #2c3e5c; border-color: #a4b9d9; }
+[data-theme="light"] .btn-trend:hover,
+[data-theme="light"] .btn-trend--active { border-color: #C8102E; color: #C8102E; background: rgba(200,16,46,.06); }
+
+/* ── Responsive: tabla en móvil con comparación ──── */
+@media (max-width: 640px) {
+  .th-compare, td:has(.cmp-val) { display: none; }
+  .table-search { width: 140px; }
+  .table-search:focus { width: 160px; }
+  .table-header-right { gap: 6px; }
+  .btn-print span { display: none; }
+  .results-summary-top { flex-direction: column; align-items: flex-start; }
+  .btn-compare { font-size: 12px; padding: 7px 12px; }
+  .row-detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .table-wrapper { font-size: 12px; }
+  .btn-print { padding: 7px 10px; }
+}
+
+/* ── Print ───────────────────────────────────────── */
+@media print {
+  .site-header, .hero, .steps-guide, .filters-panel,
+  .glosario-section, .ayuda-section, .site-footer,
+  .chat-fab, .chat-panel, .whatsapp-float,
+  .btn-export, .btn-compare, .btn-trend, .btn-print,
+  .table-search-wrap, .table-search-icon,
+  #btn-reset, .api-error-banner, .trend-section,
+  .execution-bar-legend, .chart-section,
+  .glossary-inline, .demo-notice, .table-disclaimer,
+  .update-badge { display: none !important; }
+
+  * { color: #000 !important; background: #fff !important; box-shadow: none !important; }
+  body { font-size: 11pt; }
+
+  .results-panel { display: block !important; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-card { border: 1px solid #ccc; border-radius: 6px; padding: 10px; }
+  .kpi-value { font-size: 14pt; font-weight: 700; }
+  .kpi-label { font-size: 8pt; }
+  .execution-bar-section { margin: 16px 0; }
+  .execution-bar-track { border: 1px solid #ccc; }
+  .execution-bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+  .data-table { font-size: 9pt; border-collapse: collapse; width: 100%; }
+  .data-table th, .data-table td { border: 1px solid #ddd; padding: 5px 8px; }
+  .data-table thead { background: #f0f0f0 !important; }
+  .sort-icon { display: none; }
+  .mini-bar-track, .mini-bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .row-detail { display: none; }
+
+  .results-title::after {
+    content: ' — MEF Perú · Transparencia Presupuestal';
+    font-size: 12pt; color: #666;
+  }
+
+  @page { margin: 1.5cm; }
+}
 
 /* ── Layout cabecera resultados ───────────────────── */
 .results-summary-top {
