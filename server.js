@@ -42,11 +42,6 @@ const limiterConsulta = rateLimit({
   standardHeaders: true, legacyHeaders: false,
   message: { error: 'Demasiadas consultas. Espera un minuto.' },
 });
-const limiterChat = rateLimit({
-  windowMs: 60_000, max: 10,
-  standardHeaders: true, legacyHeaders: false,
-  message: { error: 'Demasiadas preguntas al asistente. Espera un minuto.' },
-});
 
 // ── Middlewares ────────────────────────────────────
 app.use(cors());
@@ -313,52 +308,6 @@ app.delete('/api/cache', (req, res) => {
   res.json({ ok: true, mensaje: 'Caché limpiada' });
 });
 
-// ── POST /api/chat — asistente virtual MEF ────────
-const CHAT_SYSTEM = `Eres el asistente virtual del Portal de Transparencia Económica del MEF Perú.
-Ayudas a ciudadanos a entender el presupuesto público, los términos del SIAF-MEF, y cómo interpretar los datos de ejecución presupuestal.
-Responde siempre en español, de forma clara, concisa y sin tecnicismos innecesarios.
-Máximo 3 párrafos cortos. Si no sabes algo, indícalo con honestidad.`;
-
-function chatFallback(msg) {
-  const m = (msg || '').toLowerCase();
-  if (m.includes('pim'))        return 'El PIM (Presupuesto Institucional Modificado) es el presupuesto total disponible al final del año, incluyendo todas las modificaciones sobre el PIA inicial.';
-  if (m.includes('pia'))        return 'El PIA (Presupuesto Institucional de Apertura) es el presupuesto aprobado al inicio del año fiscal, antes de cualquier modificación.';
-  if (m.includes('devengado'))  return 'El devengado es el gasto reconocido cuando se recibe el bien o servicio, aunque aún no se haya pagado. Indica cuánto se ha ejecutado realmente.';
-  if (m.includes('girado'))     return 'El girado es el pago efectivo realizado: el dinero que ya salió de las arcas del Estado a manos del proveedor o beneficiario.';
-  if (m.includes('comprometido')) return 'El comprometido es el monto que ya fue reservado mediante contratos u órdenes de compra firmadas, aunque aún no se haya recibido el bien o servicio.';
-  if (m.includes('siaf'))       return 'El SIAF (Sistema Integrado de Administración Financiera) es el sistema informático del Estado peruano que registra y controla todas las operaciones presupuestales y financieras del sector público.';
-  if (m.includes('ejecuci'))    return 'La ejecución presupuestal mide el porcentaje del PIM que ya fue devengado. Un 80% o más se considera alto; menos del 60% indica baja capacidad de gasto.';
-  if (m.includes('sector'))     return 'Los sectores son los ministerios y entidades del Estado agrupados por función: Educación, Salud, Transportes, etc. Cada uno tiene su propio presupuesto asignado.';
-  return 'Puedo ayudarte a entender el presupuesto público del Perú. Pregúntame sobre términos como PIM, PIA, devengado, girado, SIAF, o cómo interpretar los indicadores de ejecución presupuestal.';
-}
-
-app.post('/api/chat', limiterChat, async (req, res) => {
-  const { messages } = req.body;
-  if (!messages || !Array.isArray(messages) || !messages.length) {
-    return res.status(400).json({ error: 'messages requerido' });
-  }
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    const lastMsg = messages[messages.length - 1]?.content || '';
-    return res.json({ reply: chatFallback(lastMsg) });
-  }
-
-  try {
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: CHAT_SYSTEM,
-      messages,
-    });
-    res.json({ reply: response.content[0].text });
-  } catch (err) {
-    console.error('[chat] Error:', err.message);
-    const lastMsg = messages[messages.length - 1]?.content || '';
-    res.json({ reply: chatFallback(lastMsg) });
-  }
-});
 
 // ══════════════════════════════════════════════════
 //  PARSER HTML DEL SIAF

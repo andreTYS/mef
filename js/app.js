@@ -1116,7 +1116,247 @@ function initThemeToggle() {
   });
 }
 
-// ── Chatbot ────────────────────────────────────────
+// ══════════════════════════════════════════════════
+//  CHATBOT ROBUSTO — Motor de intents JS (sin API externa)
+//  30+ intents, scoring por regex, context-aware, chips de sugerencia
+// ══════════════════════════════════════════════════
+
+const CHAT_INTENTS = [
+  {
+    id: 'greeting',
+    rx: [/\b(hola|buenos?\s*d[íi]as?|buenas|hey|saludos|buen\s*d[íi]a|qu[eé]\s*tal)\b/],
+    resp: ['¡Hola! Soy el asistente del Portal de Transparencia del MEF Perú.\nPuedo explicarte términos presupuestales, interpretar datos y enseñarte a usar el portal.\n¿Qué deseas saber?'],
+    sugs: ['¿Qué es el PIM?', '¿Cómo consultar el presupuesto?', '¿Qué es el SIAF?'],
+  },
+  {
+    id: 'thanks',
+    rx: [/\b(gracias|muchas\s*gracias|thanks|genial|perfecto|excelente|buen[íi]simo)\b/],
+    resp: ['¡Con gusto! Si tienes más preguntas sobre el presupuesto público, aquí estoy.'],
+    sugs: ['¿Qué es el devengado?', '¿Qué significa ejecución baja?'],
+  },
+  {
+    id: 'bye',
+    rx: [/\b(adi[oó]s|chau|hasta\s*luego|nos\s*vemos|bye|hasta\s*pronto)\b/],
+    resp: ['¡Hasta luego! Recuerda que puedes consultar el presupuesto público cuando quieras. 👋'],
+  },
+  {
+    id: 'who',
+    rx: [/qui[eé]n\s*eres|qu[eé]\s*eres|eres\s*(un\s*)?bot|eres\s*(una\s*)?ia|c[oó]mo\s*funciona(s)?|eres\s*humano/],
+    resp: ['Soy un asistente virtual del **Portal de Transparencia del MEF Perú**.\nFunciono con un motor de intents basado en reglas JavaScript — analizo tu pregunta, la comparo con patrones y devuelvo la respuesta más relevante.\nNo uso inteligencia artificial externa ni APIs de pago.'],
+  },
+  {
+    id: 'help',
+    rx: [/\b(ayuda|help)\b|qu[eé]\s*(puedes|sabes)\s*(hacer|responder)|para\s*qu[eé]\s*sirves|qu[eé]\s*temas/],
+    resp: ['Puedo ayudarte con:\n\n**📚 Glosario:** PIM, PIA, devengado, girado, comprometido, certificación, SIAF\n**📊 Interpretación:** ejecución alta/baja, cómo leer el gráfico y la tendencia\n**🏛️ Estructura:** sectores, ministerios, niveles de gobierno, regiones, canon\n**🔧 Portal:** cómo filtrar, comparar años, exportar CSV, imprimir, buscar en tabla\n**💰 Presupuesto:** ciclo presupuestal, fuente de datos, actualización\n\nEscribe tu pregunta con naturalidad o elige una sugerencia.'],
+    sugs: ['¿Qué es el PIM?', '¿Qué es el devengado?', '¿Cómo uso el portal?'],
+  },
+  {
+    id: 'pim',
+    rx: [/\bpim\b/, /presupuesto\s+(institucional\s+)?modificado/, /presupuesto\s+asignado/],
+    resp: ['El **PIM** (Presupuesto Institucional Modificado) es el presupuesto total disponible para cada sector al finalizar el año.\n\nEmpieza como el **PIA** (presupuesto inicial) y se va modificando con:\n• Créditos suplementarios\n• Transferencias entre partidas\n• Incorporación de saldos de años anteriores\n\nEn el portal: la columna **"PIM (S/)"** muestra este monto para cada sector.'],
+    sugs: ['¿Cuál es la diferencia entre PIM y PIA?', '¿Qué es el devengado?'],
+  },
+  {
+    id: 'pia',
+    rx: [/\bpia\b/, /presupuesto\s+(institucional\s+)?de\s+apertura/, /presupuesto\s+inicial/, /presupuesto\s+aprobado\s+por\s+el\s+congreso/],
+    resp: ['El **PIA** (Presupuesto Institucional de Apertura) es el presupuesto aprobado por el Congreso al inicio del año fiscal.\n\nEs la "fotografía inicial" antes de cualquier modificación. Durante el año se convierte en el **PIM**.\n\n💡 Tip: haz clic en cualquier fila de la tabla para ver el PIA exacto de ese sector.'],
+    sugs: ['¿Qué es el PIM?', '¿Cuál es la diferencia entre PIM y PIA?'],
+  },
+  {
+    id: 'pim_vs_pia',
+    rx: [/diferencia.*(pim|pia)/, /(pim|pia).*(diferencia|versus|vs\.?)/, /pim.*pia|pia.*pim/],
+    resp: ['**PIA vs PIM — diferencia clave:**\n\n**PIA** → Presupuesto inicial aprobado por el Congreso (diciembre del año anterior)\n**PIM** → PIA + todas las modificaciones durante el año fiscal\n\nEl PIM siempre es ≥ al PIA porque acumula recursos adicionales. La diferencia muestra cuántos recursos extra recibió el sector.'],
+  },
+  {
+    id: 'devengado',
+    rx: [/\bdevengado\b/, /gasto\s+(ejecutado|reconocido)/, /cu[aá]nto\s+se\s+(ha\s+)?ejecutado/, /ejecuci[oó]n\s+real/],
+    resp: ['El **devengado** es el gasto que el Estado ya reconoció porque recibió el bien o servicio contratado, aunque aún no haya pagado la factura.\n\n**Ejemplo:** Si el Estado contrató la construcción de una escuela y la obra fue entregada, ese monto es devengado aunque el pago tarde unos días más.\n\nEn el portal: columna **"Devengado (S/)"** y el **% de avance** = Devengado ÷ PIM × 100.'],
+    sugs: ['¿Cuál es la diferencia entre devengado y girado?', '¿Qué significa ejecución baja?'],
+  },
+  {
+    id: 'girado',
+    rx: [/\bgirado\b/, /pago\s+efectivo/, /dinero\s+(que\s+)?sali[oó]/, /\bpagado\b/],
+    resp: ['El **girado** es el pago efectivo ya realizado: el dinero que salió de las cuentas del Estado al proveedor o beneficiario.\n\n**Flujo del gasto:**\nComprometido → Devengado → **Girado** ✓\n\nSiempre: Girado ≤ Devengado. La diferencia son facturas ya reconocidas pero aún en trámite bancario de pago.'],
+    sugs: ['¿Qué es el devengado?', '¿Qué es el comprometido?'],
+  },
+  {
+    id: 'dev_vs_girado',
+    rx: [/diferencia.*(devengado|girado)/, /(devengado|girado).*(diferencia|versus|vs\.?)/, /devengado.*girado|girado.*devengado/, /por\s*qu[eé].*girado.*menor/],
+    resp: ['**Devengado vs Girado:**\n\n• **Devengado:** bien/servicio recibido → la obligación de pago existe\n• **Girado:** el pago fue transferido → el dinero salió del banco del Estado\n\nLa diferencia (Devengado − Girado) son facturas aprobadas aún en proceso de pago. Es normal que el girado sea ligeramente menor al cierre del mes.'],
+  },
+  {
+    id: 'comprometido',
+    rx: [/\bcomprometido\b/, /\bcompromiso\s+(anual|mensual)?\b/, /contratos?\s+firmados?/, /[oó]rdenes?\s+de\s+compra/],
+    resp: ['El **comprometido** es el monto que el Estado ya reservó mediante contratos u órdenes de compra firmadas, pero todavía no recibió el bien o servicio.\n\n**Flujo completo del gasto público:**\n1. **PIM** — presupuesto disponible\n2. **Comprometido** — contrato firmado\n3. **Devengado** — bien/servicio recibido\n4. **Girado** — pago efectuado\n\n💡 En el detalle de cada fila verás Comprometido Anual y Mensual por separado.'],
+  },
+  {
+    id: 'certificacion',
+    rx: [/\bcertificaci[oó]n\b/, /\bcertificado\b/, /antes\s+del\s+compromiso/, /disponibilidad\s+presupuestal/],
+    resp: ['La **certificación presupuestal** garantiza que existe disponibilidad de fondos antes de firmar un contrato.\n\n**Orden correcto:**\nPIM → **Certificación** → Comprometido → Devengado → Girado\n\nSin certificación no se puede comprometer gasto. Es el mecanismo de control que evita contratar sin presupuesto real.'],
+  },
+  {
+    id: 'siaf',
+    rx: [/\bsiaf\b/, /sistema\s+integrado\s+de\s+administraci[oó]n/, /sistema\s+(inform[aá]tico|del\s+estado)/, /apps5\.mineco/, /transparencia.*mef/],
+    resp: ['El **SIAF** (Sistema Integrado de Administración Financiera) es el sistema oficial del Estado peruano para registrar todas las operaciones presupuestales y financieras.\n\nTodos los datos de este portal provienen directamente del SIAF-MEF:\n🔗 apps5.mineco.gob.pe\n\nEs el mismo sistema que usan los funcionarios del Estado para registrar sus gastos diariamente en tiempo real.'],
+    sugs: ['¿Con qué frecuencia se actualizan los datos?', '¿Los datos son oficiales?'],
+  },
+  {
+    id: 'ejecucion',
+    rx: [/ejecuci[oó]n\s+presupuestal/, /\bavance\s+de\s+ejecuci/, /porcentaje\s+de\s+ejecuci/, /qu[eé]\s+significa.*%\s+de\s+avance/, /c[oó]mo\s+se\s+mide\s+la\s+ejecuci/],
+    resp: ['La **ejecución presupuestal** mide qué porcentaje del PIM ya fue devengado (gastado efectivamente).\n\n**Fórmula:** Devengado ÷ PIM × 100\n\n**Escala de colores del portal:**\n🟢 **≥ 80%** — Alto (buena gestión)\n🟡 **60–79%** — Medio (aceptable)\n🔴 **< 60%** — Bajo (requiere atención)\n\nEjemplo: un sector con 85% de ejecución gastó S/ 85 de cada S/ 100 asignados.'],
+    sugs: ['¿Qué significa ejecución baja?', '¿Por qué algunos sectores ejecutan menos?'],
+  },
+  {
+    id: 'ejecucion_baja',
+    rx: [/ejecuci[oó]n\s+(baja|baj[íi]sima)/, /\bpoco\s+ejecutado\b/, /menos\s+del\s+60/, /por\s*qu[eé]\s+(no\s+)?se\s+ejec/, /baja\s+capacidad\s+de\s+gasto/, /no\s+gast/],
+    resp: ['**¿Por qué la ejecución puede ser baja?**\n\n• **Trabas administrativas:** procesos de contratación lentos o complejos\n• **Proyectos complejos:** obras de infraestructura que tardan en iniciarse\n• **Falta de personal:** sin gestores que tramiten el gasto\n• **Problemas legales:** arbitrajes o cuestionamientos a contratos\n• **Estacionalidad:** algunos sectores concentran el gasto en ciertos meses\n\nUna ejecución baja al cierre del año puede implicar devolución de recursos al Tesoro Público.'],
+    sugs: ['¿Qué sectores ejecutan mejor?', '¿Cómo se mide la ejecución?'],
+  },
+  {
+    id: 'sectores',
+    rx: [/\bsector(es)?\b(?!\s+privado)/, /\bministerio(s)?\b/, /cu[aá]les?\s+son\s+los\s+sector/, /qu[eé]\s+sector(es)?.*presupuesto/],
+    resp: ['El presupuesto nacional se divide en **21 sectores** principales:\n\n🎓 Educación · 🏥 Salud · 🛣️ Transportes · 🔐 Interior · ⚔️ Defensa\n💰 Economía · 🏠 Vivienda · 🌾 Agricultura · ⚡ Energía y Minas\nJusticia · Trabajo · Relaciones Exteriores · Comercio Exterior\nAmbiente · Cultura · Mujer · Producción · Desarrollo Social y más.\n\nEn el portal: usa el filtro **"Sector / Ministerio"** para ver cada uno por separado.'],
+    sugs: ['¿Cuánto presupuesto tiene Educación?', '¿Cómo filtrar por sector?'],
+  },
+  {
+    id: 'educacion',
+    rx: [/\beducaci[oó]n\b/, /\bminedu\b/, /ministerio\s+de\s+educaci/],
+    resp: ['El sector **Educación** (MINEDU) es históricamente el de **mayor presupuesto** del Perú.\n\nRepresenta entre el **15–18% del presupuesto nacional**, con montos anuales cercanos a **S/ 38–42 mil millones** (2023–2025).\n\nIncluye sueldos de maestros, infraestructura escolar, materiales educativos y programas como Qali Warma.'],
+    sugs: ['¿Cuánto tiene Salud?', '¿Cómo filtrar por sector?'],
+  },
+  {
+    id: 'salud',
+    rx: [/\bsalud\b(?!\s+de\s+la\s+economía)/, /\bminsa\b/, /ministerio\s+de\s+salud/, /\bessalud\b/],
+    resp: ['El sector **Salud** (MINSA + EsSalud) es uno de los más críticos del Estado peruano.\n\nEl MINSA solo representa alrededor del **9–10% del presupuesto nacional** (~S/ 22–25 mil millones anuales).\n\nIncluye hospitales, centros de salud, medicamentos, personal médico y programas como Seguro Integral de Salud (SIS).'],
+    sugs: ['¿Cómo comparar salud vs educación?', '¿Qué es el devengado?'],
+  },
+  {
+    id: 'niveles',
+    rx: [/nivel(es)?\s+de\s+gobierno/, /gobierno\s+(nacional|regional|local)/, /\bmunicipalidad\b/, /diferencia.*nacional.*regional/, /\bgobierno\s+sub/],
+    resp: ['El presupuesto peruano se ejecuta en **3 niveles de gobierno:**\n\n🏛️ **Nacional** — Ministerios y entidades del gobierno central (Lima)\n🗺️ **Regional** — Los 25 gobiernos regionales del Perú\n🏘️ **Local** — Las 1,874 municipalidades provinciales y distritales\n\nEn el portal: cambia el filtro **"Nivel de gobierno"** para ver cada nivel por separado.'],
+    sugs: ['¿Cómo filtrar por región?', '¿Qué sectores tienen los gobiernos regionales?'],
+  },
+  {
+    id: 'regiones',
+    rx: [/\bregi[oó]n(es)?\b/, /\bdepartamento(s)?\b/, /gobierno\s+regional/, /\bcusco\b|\bcajamarca\b|\barequipa\b|\bpiura\b|\blima\s+regi/],
+    resp: ['El Perú tiene **25 regiones** con presupuesto propio ejecutado por Gobiernos Regionales.\n\n**Para consultar una región:**\n1. Selecciona **"Gobierno Regional"** en el nivel\n2. Aparecerá el filtro **"Región/Departamento"**\n3. Elige la región y presiona Consultar\n\nRegiones con mayor presupuesto: **Lima, Cusco, Piura, Cajamarca** (por tamaño y canon minero).'],
+    sugs: ['¿Qué es el canon?', '¿Qué nivel de gobierno debo elegir?'],
+  },
+  {
+    id: 'canon',
+    rx: [/\bcanon\b/, /canon\s+(minero|petrolero|gas[íi]fero|forestal|hidroenerg)/, /recursos\s+naturales.*presupuesto/],
+    resp: ['El **canon** es la participación que reciben los gobiernos regionales y locales por la explotación de recursos naturales en su territorio.\n\n**Tipos:**\n⛏️ **Minero** — Cajamarca, Áncash, Cusco (principales receptores)\n🛢️ **Petrolero** — Loreto, Ucayali\n🔥 **Gasífero** — Cusco, Ayacucho\n🌊 **Hidroenergético** — Junín, Huánuco\n\nRegiones con alto canon tienen presupuestos significativamente mayores.'],
+  },
+  {
+    id: 'ciclo',
+    rx: [/ciclo\s+presupuestal/, /proceso\s+presupuestal/, /c[oó]mo\s+se\s+(aprueba|elabora)\s+el\s+presupuesto/, /ley\s+de\s+presupuesto/, /fases?\s+del\s+presupuesto/],
+    resp: ['**Ciclo presupuestal del Perú:**\n\n📝 **Formulación** (abr–ago): Los ministerios proponen su presupuesto al MEF\n🏛️ **Aprobación** (sep–dic): El Congreso aprueba la Ley de Presupuesto\n💼 **Ejecución** (ene–dic): Las entidades gastan → esto es lo que ves en el portal\n🔍 **Evaluación** (durante el año): Contraloría y MEF supervisan el gasto\n\nEl portal muestra en tiempo real la fase de **Ejecución**.'],
+  },
+  {
+    id: 'total',
+    rx: [/presupuesto\s+total/, /cu[aá]nto\s+es\s+el\s+presupuesto/, /total\s+del\s+presupuesto/, /presupuesto\s+del\s+per[uú]/],
+    resp: ['El presupuesto total del Perú (PIM) varía cada año:\n\n• **2024:** ~S/ 249,000 millones (≈ US$ 67,000 M)\n• **2023:** ~S/ 231,000 millones\n• **2022:** ~S/ 214,000 millones\n\nPara ver el dato exacto: consulta sin filtros de sector con **"Gobierno Nacional"** y verás el total consolidado en los KPIs.'],
+    sugs: ['¿Cuánto se ha ejecutado?', '¿Qué sector tiene más presupuesto?'],
+  },
+  {
+    id: 'como_usar',
+    rx: [/c[oó]mo\s+(us[ao]r?|consult[ao]r?)\s+(el\s+portal|esto)/, /c[oó]mo\s+hago\s+una\s+consulta/, /pasos\s+para\s+consultar/, /ense[ñn][aá]me\s+a\s+us/, /c[oó]mo\s+funciona\s+el\s+portal/],
+    resp: ['**Cómo consultar el presupuesto:**\n\n1️⃣ **Elige el año** — desde 2009 hasta el actual\n2️⃣ **Nivel de gobierno** — Nacional, Regional o Local\n3️⃣ *(Opcional)* **Sector** — un ministerio específico\n4️⃣ *(Si es Regional/Local)* **Región** — elige el departamento\n5️⃣ Presiona **"Consultar ahora"**\n\n📊 Verás: KPIs, barra de progreso, gráfico y tabla detallada.\n💡 **Haz clic en cualquier fila** para ver el detalle completo (PIA, Certificación, Comprometido…)'],
+    sugs: ['¿Cómo filtrar por región?', '¿Cómo exportar los datos?'],
+  },
+  {
+    id: 'comparar',
+    rx: [/compar[ae]r?\s+(a[ñn]os?|per[íi]odos?)/, /a[ñn]o\s+anterior/, /c[oó]mo\s+compar/, /diferencia\s+entre\s+a[ñn]os?/],
+    resp: ['Para **comparar con el año anterior:**\n\n1. Realiza tu consulta normal (ej. 2024)\n2. Haz clic en **"Comparar año anterior"** (arriba de los resultados)\n3. El portal carga 2023 automáticamente\n4. La tabla agrega una columna con el devengado del año anterior\n5. El delta en puntos porcentuales aparece en 🟢 verde (+) o 🔴 rojo (−)\n\nEl gráfico muestra una tercera barra azul para el año de comparación.'],
+    sugs: ['¿Cómo leer la tendencia histórica?', '¿Cómo uso los filtros?'],
+  },
+  {
+    id: 'tendencia',
+    rx: [/tendencia\s+hist[oó]rica?/, /evoluci[oó]n\s+por\s+a[ñn]os?/, /gr[aá]fico\s+de\s+l[íi]nea/, /ver\s+tendencia/, /c[oó]mo\s+ver\s+la\s+tendencia/, /hist[oó]rico\s+de\s+ejecuci/],
+    resp: ['El **gráfico de tendencia histórica** muestra la evolución del % de ejecución desde 2018 hasta hoy.\n\n**Cómo activarlo:**\n1. Realiza una consulta\n2. Haz clic en **"Ver tendencia"** (en la sección del gráfico)\n3. El portal carga todos los años en paralelo\n\n**Cómo leerlo:**\n🟢 Puntos por encima del 80% = buena gestión histórica\n🟡 Entre 60–80% = desempeño medio\n🔴 Debajo del 60% = requiere mejora\n\nEl badge muestra el cambio total en puntos porcentuales (pp).'],
+  },
+  {
+    id: 'exportar',
+    rx: [/export[ae]r?\s+(csv|excel|datos?|tabla)/, /descarg[ae]r?\s+(datos?|tabla|informe)/, /\bcsv\b|\bexcel\b/, /guardar\s+datos/],
+    resp: ['Para **exportar a CSV:**\n\n1. Realiza una consulta\n2. Haz clic en **"Exportar CSV"** (sobre la tabla)\n3. Se descarga `mef-transparencia-XXXX.csv`\n4. Ábrelo con Excel o Google Sheets\n\nEl CSV incluye: Sector, PIM, Devengado, Girado, Comprometido y Avance %.\n\nPara datos más completos o históricos, visita el portal oficial del MEF.'],
+  },
+  {
+    id: 'imprimir',
+    rx: [/\bimprimir\b|\bprint\b/, /informe\s+impreso/, /generar\s+pdf/, /versi[oó]n\s+imprimible/],
+    resp: ['Para **imprimir el informe:**\n\n1. Realiza tu consulta\n2. Haz clic en **"Imprimir"** (junto al botón de Exportar CSV)\n3. Se abre el diálogo de impresión del navegador\n\nEl portal aplica formato limpio automáticamente:\n✅ Oculta menú, chatbot, filtros y gráficos\n✅ Optimiza KPIs y tabla para papel A4\n\n💡 Desde el diálogo también puedes guardar como **PDF**.'],
+  },
+  {
+    id: 'buscar',
+    rx: [/buscar\s+(en\s+la\s+tabla|sector)/, /filtrar\s+la\s+tabla/, /encontrar\s+un\s+sector/, /caja\s+de\s+b[uú]squeda/, /buscar\s+r[aá]pido/],
+    resp: ['La **búsqueda en tabla** filtra sectores al instante:\n\n1. Después de consultar, verás un campo de búsqueda sobre la tabla\n2. Escribe el nombre o parte del sector (ej: "trans", "educ", "salud")\n3. La tabla se filtra **en tiempo real** sin nuevas consultas al servidor\n\nMuy útil cuando hay muchos sectores en pantalla y quieres uno específico.'],
+  },
+  {
+    id: 'detalle',
+    rx: [/m[aá]s\s+detalle/, /detalle\s+completo/, /expandir\s+fila/, /clic\s+en\s+(la\s+)?fila/, /ver\s+pia|ver\s+certificaci|ver\s+comprometido/],
+    resp: ['Para ver el **detalle completo de un sector:**\n\n1. Consulta normalmente\n2. Haz **clic en cualquier fila** de la tabla (o presiona Enter)\n3. La fila se expande mostrando todos los campos:\n   • PIA, PIM, Certificación\n   • Comprometido Anual y Mensual\n   • Devengado, Girado, Avance %\n\nHaz clic de nuevo para cerrar el detalle.'],
+  },
+  {
+    id: 'actualizacion',
+    rx: [/cu[aá]ndo\s+se\s+actualiz/, /frecuencia\s+de\s+actualizaci/, /datos\s+actualizados?/, /[uú]ltima\s+actualizaci/, /cu[aá]ntos?\s+d[íi]as/],
+    resp: ['Los datos del SIAF-MEF se actualizan **diariamente** cada noche, procesando las operaciones del día anterior.\n\nEn este portal:\n🟢 Badge **"Datos actualizados al: DD/MM/AAAA"** = datos del SIAF en tiempo real\n⚡ El servidor mantiene **caché de 1 hora** para respuestas rápidas\n⚠️ Si el SIAF no está disponible, se muestran los **últimos datos guardados**'],
+    sugs: ['¿Los datos son oficiales?', '¿Qué es el SIAF?'],
+  },
+  {
+    id: 'fuente',
+    rx: [/fuente\s+de\s+datos?/, /datos\s+oficiales?/, /son\s+datos\s+reales?/, /datos\s+confiables?/, /de\s+d[oó]nde\s+vienen\s+los\s+datos?/],
+    resp: ['**Los datos son 100% oficiales**, provienen directamente del:\n\n🏛️ **SIAF-MEF** — Sistema Integrado de Administración Financiera\nPortal oficial: apps5.mineco.gob.pe\n\nSon los mismos datos que usa el Estado peruano para reportar la ejecución presupuestal. No se modifican ni interpolan: se extraen y presentan tal como los publica el MEF.'],
+  },
+  {
+    id: 'app_pwa',
+    rx: [/instalar\s+(la\s+)?app/, /agregar\s+a\s+(pantalla|inicio)/, /app\s+m[oó]vil/, /funciona\s+sin\s+internet/, /\bpwa\b/],
+    resp: ['Este portal es una **PWA (Progressive Web App)** — puedes instalarlo como app en tu celular:\n\n**Android (Chrome):**\n1. Abre el portal en Chrome\n2. Toca los 3 puntos → "Agregar a pantalla de inicio"\n\n**iOS (Safari):**\n1. Abre en Safari → icono compartir\n2. "Añadir a pantalla de inicio"\n\nFunciona offline con los últimos datos en caché.'],
+  },
+];
+
+// ── Motor de detección y respuesta ────────────────
+const CHATBOT = {
+  lastIntent: null,
+
+  norm(t) {
+    return t.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[¿¡]/g, ' ');
+  },
+
+  detect(text) {
+    const t = this.norm(text);
+    let best = null, topScore = 0;
+    for (const intent of CHAT_INTENTS) {
+      let score = 0;
+      for (const rx of intent.rx) { if (rx.test(t)) score += 2; }
+      // bonus si la misma intención fue la última (contexto de conversación)
+      if (score > 0 && intent.id === this.lastIntent) score += 1;
+      if (score > topScore) { best = intent; topScore = score; }
+    }
+    return topScore > 0 ? best : null;
+  },
+
+  respond(text) {
+    const intent = this.detect(text);
+    if (!intent) {
+      return {
+        html: this.fmt('No entendí bien tu pregunta. 🤔\nPuedo ayudarte con:\n• Términos: **PIM, PIA, devengado, girado, SIAF**\n• Ejecución presupuestal y cómo interpretarla\n• Cómo filtrar, comparar años, exportar o imprimir\n• Sectores, regiones y niveles de gobierno\n\nEscribe **"ayuda"** para ver todo lo que sé.'),
+        sugs: ['¿Qué es el PIM?', '¿Cómo uso el portal?', 'ayuda'],
+      };
+    }
+    this.lastIntent = intent.id;
+    const txt = intent.resp[Math.floor(Math.random() * intent.resp.length)];
+    return { html: this.fmt(txt), sugs: intent.sugs || [] };
+  },
+
+  fmt(text) {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  },
+};
+
+// ── Chatbot UI ─────────────────────────────────────
 function initChatbot() {
   const fab      = document.getElementById('chat-fab');
   const panel    = document.getElementById('chat-panel');
@@ -1126,8 +1366,6 @@ function initChatbot() {
   const msgList  = document.getElementById('chat-messages');
   if (!fab || !panel) return;
 
-  let history = [];
-
   function togglePanel(open) {
     panel.hidden = !open;
     fab.setAttribute('aria-expanded', String(open));
@@ -1136,55 +1374,59 @@ function initChatbot() {
 
   fab.addEventListener('click', () => togglePanel(panel.hidden));
   closeBtn.addEventListener('click', () => togglePanel(false));
-
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !panel.hidden) togglePanel(false);
   });
 
-  form.addEventListener('submit', async e => {
+  form.addEventListener('submit', e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
-    input.disabled = true;
 
-    appendMsg('user', text);
-    history.push({ role: 'user', content: text });
+    appendMsg('user', null, text);
 
-    const typing = appendMsg('bot', '· · ·', true);
-
-    try {
-      if (API_BASE === null) throw new Error('no-server');
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+    // Pequeño delay para simular "pensando"
+    const typing = appendMsg('bot', null, '· · ·', true);
+    setTimeout(() => {
       typing.remove();
-      appendMsg('bot', json.reply);
-      history.push({ role: 'assistant', content: json.reply });
-    } catch {
-      typing.remove();
-      appendMsg('bot', 'Lo siento, no pude procesar tu pregunta ahora. Revisa el glosario o las preguntas frecuentes del portal.');
-    } finally {
-      input.disabled = false;
+      const { html, sugs } = CHATBOT.respond(text);
+      const msgEl = appendMsg('bot', html);
+      if (sugs.length) addSuggestions(msgEl, sugs);
       input.focus();
-    }
+    }, 320);
   });
 
-  function appendMsg(role, text, isTyping = false) {
+  function appendMsg(role, html, text, isTyping = false) {
     const div = document.createElement('div');
     div.className = `chat-msg chat-msg--${role}`;
     if (isTyping) div.classList.add('chat-msg--typing');
     const p = document.createElement('p');
-    p.textContent = text;
+    if (html) { p.innerHTML = html; }
+    else       { p.textContent = text || ''; }
     div.appendChild(p);
     msgList.appendChild(div);
     msgList.scrollTop = msgList.scrollHeight;
     return div;
+  }
+
+  function addSuggestions(afterEl, sugs) {
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-sugs';
+    sugs.forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'chat-sug-btn';
+      btn.textContent = s;
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        input.value = s;
+        wrap.remove();
+        form.dispatchEvent(new Event('submit'));
+      });
+      wrap.appendChild(btn);
+    });
+    afterEl.after(wrap);
+    msgList.scrollTop = msgList.scrollHeight;
   }
 }
 

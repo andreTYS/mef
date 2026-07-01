@@ -1306,6 +1306,43 @@ img { display: block; max-width: 100%; }
   border-color: #c4d3e8;
 }
 
+/* ── Suggestion chips ─────────────────────────────── */
+.chat-sugs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+.chat-sug-btn {
+  background: rgba(96,165,250,.12);
+  border: 1px solid rgba(96,165,250,.35);
+  border-radius: 20px;
+  color: var(--blue-acc);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 5px 11px;
+  transition: background var(--transition), border-color var(--transition);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-sug-btn:hover {
+  background: rgba(96,165,250,.25);
+  border-color: var(--blue-acc);
+}
+[data-theme="light"] .chat-sug-btn {
+  background: #e8f0ff;
+  border-color: #a0b8e8;
+  color: #1a4a9f;
+}
+[data-theme="light"] .chat-sug-btn:hover {
+  background: #d0e0ff;
+  border-color: #1a4a9f;
+}
+
 @media (max-width: 480px) {
   .chat-fab  { bottom: 16px; left: 16px; width: 50px; height: 50px; }
   .chat-panel { left: 12px; right: 12px; width: auto; bottom: 80px; max-height: 420px; }
