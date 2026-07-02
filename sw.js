@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'mef-transparencia-v1';
+const CACHE_NAME = 'mef-transparencia-v2';
 const STATIC_ASSETS = [
   '/',
   '/css/styles.css',
