@@ -860,7 +860,8 @@ function initKeyboardShortcuts() {
 }
 
 // ── API oficial — servidor Node proxy ──────────────
-const API_BASE = window.location.port === '3000' ? '' : null;
+// Siempre mismo origen; null solo en file:// (sin servidor)
+const API_BASE = location.protocol === 'file:' ? null : '';
 
 // ── Mapa región selector → palabra clave SIAF ──────
 const REGION_SIAF = {
