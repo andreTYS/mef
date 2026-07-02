@@ -825,24 +825,13 @@ function initMobileMenu() {
   btn.addEventListener('click', () => {
     const expanded = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', String(!expanded));
-    nav.style.display = expanded ? '' : 'flex';
-    nav.style.flexDirection = 'column';
-    nav.style.position      = 'fixed';
-    nav.style.top           = '72px';
-    nav.style.left          = '0';
-    nav.style.right         = '0';
-    nav.style.background    = 'white';
-    nav.style.padding       = '12px 16px';
-    nav.style.boxShadow     = '0 8px 24px rgba(0,0,0,.12)';
-    nav.style.zIndex        = '99';
-    if (expanded) nav.removeAttribute('style');
+    nav.classList.toggle('nav--open', !expanded);
   });
 
-  // Cerrar al hacer click en un enlace
   nav.querySelectorAll('a').forEach(a => {
     a.addEventListener('click', () => {
       btn.setAttribute('aria-expanded', 'false');
-      nav.removeAttribute('style');
+      nav.classList.remove('nav--open');
     });
   });
 }
@@ -1577,8 +1566,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTrend();
   initPrint();
 
-  cargarHeroStats().catch(() => setTimeout(animateHeroNumbers, 600));
-  setTimeout(animateHeroNumbers, 600);
+  cargarHeroStats().catch(animateHeroNumbers);
 });
 
 // ── Service Worker (PWA) ──────────────────────────

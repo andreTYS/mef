@@ -1018,12 +1018,29 @@ img { display: block; max-width: 100%; }
   .filters-grid  { grid-template-columns: 1fr; }
   .kpi-grid      { grid-template-columns: 1fr 1fr; }
   .glossary-grid { grid-template-columns: 1fr 1fr; }
+  .glossary-inline { display: none; }
   .glosario-grid { grid-template-columns: 1fr; }
   .footer-inner  { grid-template-columns: 1fr; gap: 28px; }
   .header-nav    { display: none; }
+  .header-nav.nav--open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 72px;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.22);
+    z-index: 999;
+    border-bottom: 1px solid var(--border-dim);
+    gap: 2px;
+  }
   .mobile-menu-btn { display: flex; }
   .filters-panel { padding: 20px; }
   .hero-stats    { gap: 16px; padding: 16px; }
+  .chart-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .chart-bars { min-width: 360px; }
 }
 @media (max-width: 480px) {
   .kpi-grid   { grid-template-columns: 1fr; }
@@ -1032,6 +1049,12 @@ img { display: block; max-width: 100%; }
   .filters-footer { flex-direction: column; align-items: stretch; }
   .btn-primary { justify-content: center; }
   .whatsapp-float { bottom: 16px; right: 16px; width: 50px; height: 50px; }
+  .table-header { flex-direction: column; align-items: stretch; }
+  .table-header-left { flex-direction: column; gap: 8px; }
+  .table-header-right { flex-wrap: wrap; gap: 6px; }
+  .table-search-wrap { width: 100%; }
+  .table-search { width: 100% !important; }
+  .table-search:focus { width: 100% !important; }
 }
 
 /* ══════════════════════════════════════════════════
@@ -1078,6 +1101,11 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 1px 4px rgba(15,23,41,.07);
 }
 [data-theme="light"] .faq-item[open] { border-color: #3A5073; }
+[data-theme="light"] .header-nav.nav--open {
+  background: #fff;
+  border-bottom-color: #c4d3e8;
+  box-shadow: 0 8px 24px rgba(15,23,41,.14);
+}
 [data-theme="light"] .chart-section,
 [data-theme="light"] .table-section,
 [data-theme="light"] .execution-bar-section {
