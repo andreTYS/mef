@@ -19,7 +19,10 @@ const cheerio  = require('cheerio');
 
 const VPS_URL     = process.env.VPS_URL     || 'https://masredespro.com';
 const FEED_SECRET = process.env.FEED_SECRET || '';
-const ANIOS       = [new Date().getFullYear(), new Date().getFullYear() - 1];
+// Años a enviar: desde 2020 hasta el año actual
+const YEAR_START = parseInt(process.env.YEAR_START || '2020');
+const YEAR_END   = new Date().getFullYear();
+const ANIOS      = Array.from({ length: YEAR_END - YEAR_START + 1 }, (_, i) => YEAR_END - i);
 
 // ── Scraping SIAF via Playwright ────────────────────
 async function scrapearSIAF(anio, dim) {
