@@ -11,9 +11,31 @@ const rateLimit   = require('express-rate-limit');
 const path        = require('path');
 const fs          = require('fs');
 
-const app      = express();
-const PORT     = process.env.PORT || 3000;
-const DATA_DIR = path.join(__dirname, 'data');
+const app       = express();
+const PORT      = process.env.PORT || 3000;
+const DATA_DIR  = path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'cache.json');
+
+// ── Espejo en memoria de lo que está en disco ──────
+// Se mantiene sincronizado con NodeCache.
+// Permite reescribir cache.json en una sola operación.
+let diskCache   = {};
+let _writeTimer = null;
+
+function guardarEnDisco() {
+  // Debounce: si llegan varias actualizaciones seguidas (ej. feeder
+  // enviando 8 peticiones), espera 600 ms y escribe una sola vez.
+  // fs.promises.writeFile es ASÍNCRONO — no bloquea el event loop.
+  clearTimeout(_writeTimer);
+  _writeTimer = setTimeout(async () => {
+    try {
+      await fs.promises.writeFile(DATA_FILE, JSON.stringify(diskCache), 'utf8');
+      console.log(`[disk] ✓ cache.json actualizado (${Object.keys(diskCache).length} entradas)`);
+    } catch (e) {
+      console.error('[disk] Error al guardar:', e.message);
+    }
+  }, 600);
+}
 
 // ── Caché en memoria (evita sobrecargar el servidor MEF) ──
 // TTL: 1 hora por defecto (el SIAF actualiza cada noche)
@@ -62,18 +84,23 @@ app.use((req, res, next) => {
 
 // ── GET /api/status — healthcheck ─────────────────
 app.get('/api/status', (req, res) => {
-  const dataFiles = fs.existsSync(DATA_DIR)
-    ? fs.readdirSync(DATA_DIR).filter(f => f.startsWith('siaf_') && f.endsWith('.json')).map(f => {
-        const stat = fs.statSync(path.join(DATA_DIR, f));
-        return { archivo: f, modificado: stat.mtime.toISOString() };
-      })
-    : [];
+  let diskInfo = null;
+  if (fs.existsSync(DATA_FILE)) {
+    const stat = fs.statSync(DATA_FILE);
+    diskInfo = {
+      archivo:    'cache.json',
+      entradas:   Object.keys(diskCache).length,
+      modificado: stat.mtime.toISOString(),
+      bytes:      stat.size,
+    };
+  }
   res.json({
     ok:       true,
-    version:  '1.1.0',
+    version:  '1.2.0',
     uptime_s: Math.floor(process.uptime()),
     cache:    cache.getStats(),
-    datos:    dataFiles,
+    disco:    diskInfo,
+    claves:   Object.keys(diskCache),
     time:     new Date().toISOString(),
   });
 });
@@ -459,26 +486,29 @@ const REGIONES_MEF = [
   { ubigeo: '260000', nombre: 'Lima Región' },
 ];
 
+// ── Cargar datos persistidos al iniciar el servidor ─
+// Se hace con readFileSync (SÍNCRONO) porque ocurre ANTES de que el
+// servidor comience a aceptar peticiones — no hay nadie esperando,
+// así que bloquear aquí es aceptable e incluso deseable.
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  if (fs.existsSync(DATA_FILE)) {
+    diskCache = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    let n = 0;
+    for (const [key, data] of Object.entries(diskCache)) {
+      cache.set(key, data);
+      n++;
+    }
+    console.log(`[disk] ✓ ${n} entradas cargadas desde cache.json`);
+  }
+} catch (e) {
+  console.warn('[disk] No se pudo leer cache.json:', e.message);
+  diskCache = {};
+}
+
 // ── POST /api/feed — recibir datos desde PC peruana ──
 // El feeder.js que corre en la PC de Perú scraping SIAF y envía aquí.
 // Protegido por FEED_SECRET en .env
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-
-// Cargar datos persistidos al iniciar el servidor
-(function cargarDatosPersistidos() {
-  try {
-    const archivos = fs.readdirSync(DATA_DIR).filter(f => f.startsWith('siaf_') && f.endsWith('.json'));
-    archivos.forEach(f => {
-      const data = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8'));
-      const key  = `consulta_${data.anio}_${data.dim || ''}`;
-      cache.set(key, data);
-      console.log(`[feed] Cargado desde disco: ${key} (${data.total_registros} reg.)`);
-    });
-  } catch (e) {
-    console.warn('[feed] Sin datos persistidos:', e.message);
-  }
-})();
-
 app.post('/api/feed', (req, res) => {
   const secret = req.headers['x-feed-secret'] || req.body?.secret;
   if (!process.env.FEED_SECRET || secret !== process.env.FEED_SECRET) {
@@ -492,13 +522,17 @@ app.post('/api/feed', (req, res) => {
 
   const dim = data.dim || '';
   const key = `consulta_${data.anio}_${dim}`;
+
+  // 1. Actualizar caché en memoria (respuesta inmediata a futuros /api/consulta)
   cache.set(key, data);
 
-  // Persistir en disco para sobrevivir reinicios
-  const archivo = path.join(DATA_DIR, `siaf_${data.anio}_${dim || 'total'}.json`);
-  fs.writeFileSync(archivo, JSON.stringify(data));
+  // 2. Actualizar espejo diskCache y programar escritura asíncrona.
+  //    NO usamos writeFileSync aquí — bloquearía el servidor durante
+  //    la escritura, y el feeder envía 8 peticiones seguidas.
+  diskCache[key] = data;
+  guardarEnDisco();
 
-  console.log(`[feed] ✓ ${key} — ${data.total_registros} registros guardados`);
+  console.log(`[feed] ✓ ${key} — ${data.total_registros} registros`);
   res.json({ ok: true, key, registros: data.total_registros });
 });
 
