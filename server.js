@@ -211,10 +211,19 @@ app.get('/api/consulta', limiterConsulta, async (req, res) => {
   const { anio = 2024, dim = '' } = req.query;
 
   const cacheKey = `consulta_${anio}_${dim}`;
-  const cached   = cache.get(cacheKey);
+
+  // 1. Caché en memoria (más rápido)
+  const cached = cache.get(cacheKey);
   if (cached) {
-    console.log(`[cache hit] ${cacheKey}`);
+    console.log(`[cache hit RAM] ${cacheKey}`);
     return res.json({ fuente: 'siaf-mef', cached: true, ...cached });
+  }
+
+  // 2. Fallback a disco — si el TTL expiró pero el feeder ya envió datos
+  if (diskCache[cacheKey]) {
+    console.log(`[cache hit DISCO] ${cacheKey}`);
+    cache.set(cacheKey, diskCache[cacheKey], 0); // restaura en RAM sin TTL
+    return res.json({ fuente: 'siaf-mef', cached: true, ...diskCache[cacheKey] });
   }
 
   // ═══════════════════════════════════════════════════
@@ -225,7 +234,7 @@ app.get('/api/consulta', limiterConsulta, async (req, res) => {
     const pwData = await scraperPlaywright(anio, dim || null);
     if (pwData && pwData.total_registros > 0) {
       if (dim) pwData.dimension = dim;
-      cache.set(cacheKey, pwData);
+      cache.set(cacheKey, pwData); // TTL normal: puede expirar (IP peruana lo actualizará)
       return res.json({ fuente: 'siaf-mef', cached: false, ...pwData });
     }
   } catch (pwErr) {
@@ -496,7 +505,7 @@ try {
     diskCache = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     let n = 0;
     for (const [key, data] of Object.entries(diskCache)) {
-      cache.set(key, data);
+      cache.set(key, data, 0); // TTL=0 → nunca expira (ya está en disco)
       n++;
     }
     console.log(`[disk] ✓ ${n} entradas cargadas desde cache.json`);
@@ -523,8 +532,8 @@ app.post('/api/feed', (req, res) => {
   const dim = data.dim || '';
   const key = `consulta_${data.anio}_${dim}`;
 
-  // 1. Actualizar caché en memoria (respuesta inmediata a futuros /api/consulta)
-  cache.set(key, data);
+  // 1. Actualizar caché en memoria sin TTL (está persistido en disco)
+  cache.set(key, data, 0);
 
   // 2. Actualizar espejo diskCache y programar escritura asíncrona.
   //    NO usamos writeFileSync aquí — bloquearía el servidor durante
